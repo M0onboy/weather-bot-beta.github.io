@@ -34,9 +34,14 @@ const messages = {
     visibilityNote: "Минимум за 24 часа",
     sun: "Солнце",
     sunrise: "Восход",
+    sunset: "Закат",
     windShort: "Ветер",
     rainShort: "Осадки",
     uvShort: "UV",
+    details: "Подробнее",
+    tempRange: "Диапазон",
+    maxWind: "Ветер до",
+    gustsShort: "Порывы",
   },
   kk: {
     city: "Қала",
@@ -70,9 +75,14 @@ const messages = {
     visibilityNote: "24 сағаттағы минимум",
     sun: "Күн",
     sunrise: "Күн шығуы",
+    sunset: "Күн батуы",
     windShort: "Жел",
     rainShort: "Жауын",
     uvShort: "UV",
+    details: "Толығырақ",
+    tempRange: "Аралық",
+    maxWind: "Жел дейін",
+    gustsShort: "Екпіні",
   },
   en: {
     city: "City",
@@ -106,9 +116,14 @@ const messages = {
     visibilityNote: "Minimum for 24 hours",
     sun: "Sun",
     sunrise: "Sunrise",
+    sunset: "Sunset",
     windShort: "Wind",
     rainShort: "Rain",
     uvShort: "UV",
+    details: "Details",
+    tempRange: "Range",
+    maxWind: "Wind up to",
+    gustsShort: "Gusts",
   },
 };
 
@@ -282,9 +297,14 @@ async function loadForecast(location) {
       "weather_code",
       "temperature_2m_max",
       "temperature_2m_min",
+      "apparent_temperature_max",
+      "apparent_temperature_min",
       "sunrise",
       "sunset",
       "uv_index_max",
+      "rain_sum",
+      "showers_sum",
+      "snowfall_sum",
       "precipitation_sum",
       "precipitation_probability_max",
       "wind_speed_10m_max",
@@ -346,16 +366,32 @@ function renderDaily(data) {
     const low = data.daily.temperature_2m_min[index];
     const high = data.daily.temperature_2m_max[index];
     const type = iconType(data.daily.weather_code[index]);
+    const [description] = describe(data.daily.weather_code[index]);
     const width = Math.max(18, ((high - low) / Math.max(1, max - min)) * 100);
-    const row = document.createElement("article");
-    row.className = "day-row";
-    row.innerHTML = `
-      <strong>${index === 0 ? msg("today") : dayLabel(time)}</strong>
-      <span class="day-icon">${weatherIcon(type, true)}</span>
-      <span class="bar" style="width:${width}%"></span>
-      <span class="daily-meta">${round(low)}° / ${round(high)}°</span>
+    const card = document.createElement("details");
+    card.className = "day-card";
+    if (index === 0) card.open = true;
+    card.innerHTML = `
+      <summary class="day-row">
+        <strong>${index === 0 ? msg("today") : dayLabel(time)}</strong>
+        <span class="day-icon">${weatherIcon(type, true)}</span>
+        <span class="bar-wrap"><span class="bar" style="width:${width}%"></span></span>
+        <span class="daily-meta">${round(low)}° / ${round(high)}°</span>
+      </summary>
+      <div class="day-details">
+        <div class="day-condition">${description}</div>
+        <div><span>${msg("tempRange")}</span><strong>${round(low)}°...${round(high)}°</strong></div>
+        <div><span>${msg("feels")}</span><strong>${round(data.daily.apparent_temperature_min[index])}°...${round(data.daily.apparent_temperature_max[index])}°</strong></div>
+        <div><span>${msg("precipitation")}</span><strong>${data.daily.precipitation_sum[index]} mm</strong></div>
+        <div><span>${msg("chance")}</span><strong>${data.daily.precipitation_probability_max[index]}%</strong></div>
+        <div><span>${msg("maxWind")}</span><strong>${round(data.daily.wind_speed_10m_max[index])} km/h</strong></div>
+        <div><span>${msg("gustsShort")}</span><strong>${round(data.daily.wind_gusts_10m_max[index])} km/h</strong></div>
+        <div><span>${msg("uv")}</span><strong>${data.daily.uv_index_max[index]}</strong></div>
+        <div><span>${msg("sunrise")}</span><strong>${data.daily.sunrise[index].slice(-5)}</strong></div>
+        <div><span>${msg("sunset")}</span><strong>${data.daily.sunset[index].slice(-5)}</strong></div>
+      </div>
     `;
-    holder.append(row);
+    holder.append(card);
   });
 }
 
@@ -366,20 +402,23 @@ function renderStats(data) {
   const first24 = (key) => hourly[key].slice(0, 24);
   const avg = (values) => Math.round(values.reduce((sum, value) => sum + Number(value), 0) / values.length);
   const stats = [
-    [msg("feels"), `${round(current.apparent_temperature)}°`, msg("feelsNote")],
-    [msg("humidity"), `${current.relative_humidity_2m}%`, `${msg("humidityAvg")}: ${avg(first24("relative_humidity_2m"))}%`],
-    [msg("wind"), `${round(current.wind_speed_10m)} km/h`, `${msg("gusts")} ${round(current.wind_gusts_10m)} km/h`],
-    [msg("pressure"), `${round(current.pressure_msl)} hPa`, `${msg("pressureAvg")}: ${avg(first24("pressure_msl"))} hPa`],
-    [msg("uv"), `${daily.uv_index_max[0]}`, msg("uvNote")],
-    [msg("precipitation"), `${daily.precipitation_sum[0]} mm`, `${msg("chance")} ${daily.precipitation_probability_max[0]}%`],
-    [msg("visibility"), `${(Math.min(...first24("visibility")) / 1000).toFixed(1)} km`, msg("visibilityNote")],
-    [msg("sun"), daily.sunset[0].slice(-5), `${msg("sunrise")} ${daily.sunrise[0].slice(-5)}`],
+    ["thermo", "🌡", msg("feels"), `${round(current.apparent_temperature)}°`, msg("feelsNote")],
+    ["humidity", "💧", msg("humidity"), `${current.relative_humidity_2m}%`, `${msg("humidityAvg")}: ${avg(first24("relative_humidity_2m"))}%`],
+    ["wind", "💨", msg("wind"), `${round(current.wind_speed_10m)} km/h`, `${msg("gusts")} ${round(current.wind_gusts_10m)} km/h`],
+    ["pressure", "🧭", msg("pressure"), `${round(current.pressure_msl)} hPa`, `${msg("pressureAvg")}: ${avg(first24("pressure_msl"))} hPa`],
+    ["uv", "☀️", msg("uv"), `${daily.uv_index_max[0]}`, msg("uvNote")],
+    ["rain", "🌧", msg("precipitation"), `${daily.precipitation_sum[0]} mm`, `${msg("chance")} ${daily.precipitation_probability_max[0]}%`],
+    ["visibility", "👁", msg("visibility"), `${(Math.min(...first24("visibility")) / 1000).toFixed(1)} km`, msg("visibilityNote")],
+    ["sun", "🌇", msg("sun"), daily.sunset[0].slice(-5), `${msg("sunrise")} ${daily.sunrise[0].slice(-5)}`],
   ];
   $("#stats").innerHTML = stats
     .map(
-      ([label, value, note]) => `
-        <article>
-          <div class="stat-label">${label}</div>
+      ([tone, icon, label, value, note]) => `
+        <article class="stat-${tone}">
+          <div class="stat-head">
+            <span class="stat-icon">${icon}</span>
+            <span class="stat-label">${label}</span>
+          </div>
           <div class="stat-value">${value}</div>
           <div class="stat-note">${note}</div>
         </article>

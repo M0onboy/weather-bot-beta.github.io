@@ -380,18 +380,74 @@ h2 {
   gap: 8px;
 }
 
+.day-card {
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+
+.day-card summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.day-card summary::-webkit-details-marker {
+  display: none;
+}
+
 .day-row {
   min-height: 48px;
   display: grid;
   grid-template-columns: 72px 34px 1fr 74px;
   gap: 10px;
   align-items: center;
+  padding: 6px 10px;
+}
+
+.bar-wrap {
+  height: 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  overflow: hidden;
 }
 
 .bar {
+  display: block;
   height: 7px;
   border-radius: 999px;
   background: linear-gradient(90deg, #6fd3ff, #ffd36f);
+}
+
+.day-details {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 0 10px 12px;
+}
+
+.day-condition {
+  grid-column: 1 / -1;
+  color: rgba(255, 255, 255, 0.86);
+  font-weight: 700;
+}
+
+.day-details div:not(.day-condition) {
+  min-height: 48px;
+  border-radius: 14px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.day-details span {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.day-details strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 15px;
 }
 
 .stats-grid {
@@ -418,6 +474,61 @@ h2 {
   height: 92px;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.08);
+}
+
+.stats-grid article::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: var(--stat-accent, rgba(255, 255, 255, 0.5));
+}
+
+.stat-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stat-icon {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.stat-thermo {
+  --stat-accent: #ffd36f;
+}
+
+.stat-humidity {
+  --stat-accent: #7fe3ff;
+}
+
+.stat-wind {
+  --stat-accent: #b6f1d3;
+}
+
+.stat-pressure {
+  --stat-accent: #c7b9ff;
+}
+
+.stat-uv {
+  --stat-accent: #ffe066;
+}
+
+.stat-rain {
+  --stat-accent: #70a7ff;
+}
+
+.stat-visibility {
+  --stat-accent: #d8e7ff;
+}
+
+.stat-sun {
+  --stat-accent: #ff9f7f;
 }
 
 .stat-value {
@@ -474,5 +585,9 @@ h2 {
   .day-row {
     grid-template-columns: 58px 30px 1fr 64px;
     gap: 8px;
+  }
+
+  .day-details {
+    grid-template-columns: 1fr;
   }
 }
