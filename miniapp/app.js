@@ -63,10 +63,27 @@ const messages = {
     maxToday: "Макс.",
     avgToday: "Среднее",
     nextPeak: "Пик в ближайшие часы",
+    time: "Время",
     saveCity: "Сохранить город",
     savedCity: "Город сохранён",
+    favorites: "Избранное",
+    favoritesEmpty: "Пока нет избранных городов",
+    delete: "Удалить",
     weatherAlert: "Погодное предупреждение",
     noAlerts: "Серьёзных рисков не видно",
+    alertUv: "Высокий UV: лучше использовать солнцезащиту в середине дня.",
+    alertRain: "Осадки вероятны: возьмите зонт или дождевик.",
+    alertWind: "Сильные порывы ветра: будьте осторожны на открытых участках.",
+    alertFog: "Возможен туман: видимость может быть снижена.",
+    alertHeat: "Жаркая погода: пейте больше воды и избегайте перегрева.",
+    alertCold: "Очень холодно: лучше одеться теплее.",
+    units: {
+      speed: "км/ч",
+      pressure: "гПа",
+      precip: "мм",
+      distance: "км",
+      max: "макс.",
+    },
   },
   kk: {
     city: "Қала",
@@ -129,10 +146,27 @@ const messages = {
     maxToday: "Макс.",
     avgToday: "Орташа",
     nextPeak: "Жақын сағаттардағы максимум",
+    time: "Уақыт",
     saveCity: "Қаланы сақтау",
     savedCity: "Қала сақталды",
+    favorites: "Таңдаулы",
+    favoritesEmpty: "Таңдаулы қалалар жоқ",
+    delete: "Жою",
     weatherAlert: "Ауа райы ескертуі",
     noAlerts: "Маңызды қауіп байқалмайды",
+    alertUv: "UV жоғары: күн ортасында күннен қорғаныс қолданыңыз.",
+    alertRain: "Жауын-шашын ықтимал: қолшатыр немесе жаңбырлық алыңыз.",
+    alertWind: "Жел екпіні қатты: ашық жерде абай болыңыз.",
+    alertFog: "Тұман болуы мүмкін: көріну төмендеуі ықтимал.",
+    alertHeat: "Күн ыстық: көбірек су ішіп, қызып кетуден сақтаныңыз.",
+    alertCold: "Өте суық: жылырақ киініңіз.",
+    units: {
+      speed: "км/сағ",
+      pressure: "гПа",
+      precip: "мм",
+      distance: "км",
+      max: "макс.",
+    },
   },
   en: {
     city: "City",
@@ -195,10 +229,27 @@ const messages = {
     maxToday: "Max",
     avgToday: "Average",
     nextPeak: "Next-hours peak",
+    time: "Time",
     saveCity: "Save city",
     savedCity: "City saved",
+    favorites: "Favorites",
+    favoritesEmpty: "No favorite cities yet",
+    delete: "Delete",
     weatherAlert: "Weather alert",
     noAlerts: "No major risks visible",
+    alertUv: "High UV: use sun protection around midday.",
+    alertRain: "Rain is likely: take an umbrella or rain jacket.",
+    alertWind: "Strong gusts: be careful in open areas.",
+    alertFog: "Fog is possible: visibility may be reduced.",
+    alertHeat: "Hot weather: drink more water and avoid overheating.",
+    alertCold: "Very cold: dress warmer.",
+    units: {
+      speed: "km/h",
+      pressure: "hPa",
+      precip: "mm",
+      distance: "km",
+      max: "max",
+    },
   },
 };
 
@@ -233,16 +284,62 @@ const initialLang = telegramLang.startsWith("kk") || telegramLang.startsWith("kz
     ? "en"
     : localStorage.getItem("weatherLang") || "ru";
 
+function readStoredFavorites() {
+  try {
+    return JSON.parse(localStorage.getItem("weatherFavorites") || "[]");
+  } catch {
+    return [];
+  }
+}
+
+function decodeSyncPayload() {
+  const encoded = new URLSearchParams(window.location.search).get("sync");
+  if (!encoded) return null;
+  try {
+    const base64 = encoded.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(encoded.length / 4) * 4, "=");
+    const json = decodeURIComponent(
+      Array.from(atob(base64), (char) => `%${char.charCodeAt(0).toString(16).padStart(2, "0")}`).join(""),
+    );
+    return JSON.parse(json);
+  } catch {
+    return null;
+  }
+}
+
+function favoriteKey(location) {
+  return `${Number(location.latitude).toFixed(4)}:${Number(location.longitude).toFixed(4)}`;
+}
+
+function mergeFavorites(...groups) {
+  const merged = new Map();
+  groups.flat().forEach((item) => {
+    if (!item?.name || item.latitude === undefined || item.longitude === undefined) return;
+    merged.set(favoriteKey(item), {
+      id: item.id,
+      name: item.name,
+      latitude: Number(item.latitude),
+      longitude: Number(item.longitude),
+      country: item.country || "",
+      timezone: item.timezone || "",
+    });
+  });
+  return Array.from(merged.values()).slice(0, 8);
+}
+
+const syncPayload = decodeSyncPayload();
+
 const state = {
-  lang: ["ru", "kk", "en"].includes(initialLang) ? initialLang : "ru",
+  lang: ["ru", "kk", "en"].includes(syncPayload?.lang) ? syncPayload.lang : ["ru", "kk", "en"].includes(initialLang) ? initialLang : "ru",
   location: { name: "Almaty", latitude: 43.25, longitude: 76.95, country: "Kazakhstan" },
   data: null,
-  favorites: JSON.parse(localStorage.getItem("weatherFavorites") || "[]"),
+  favorites: mergeFavorites(syncPayload?.favorites || [], readStoredFavorites()),
 };
+localStorage.setItem("weatherFavorites", JSON.stringify(state.favorites));
 
 const $ = (selector) => document.querySelector(selector);
 const round = (value) => Math.round(Number(value));
 const msg = (key) => messages[state.lang][key];
+const unit = (key) => messages[state.lang].units[key];
 const motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
 
 const weatherCanvas = {
@@ -648,10 +745,12 @@ function applyStaticText() {
   $("#tempChartTitle").textContent = msg("temperature");
   $("#rainChartTitle").textContent = msg("precipitation");
   $("#saveCityButton").title = msg("saveCity");
+  $("#favoritesMenuButton").title = msg("favorites");
+  $("#favoritesTitle").textContent = msg("favorites");
   document.querySelectorAll("[data-lang]").forEach((button) => {
     button.classList.toggle("active", button.dataset.lang === state.lang);
   });
-  renderFavorites();
+  renderFavoritesMenu();
 }
 
 async function geocode(city) {
@@ -732,7 +831,7 @@ function renderCurrent(location, data) {
   $("#condition").textContent = description;
   $("#range").textContent = `${msg("max")} ${round(daily.temperature_2m_max[0])}° ${msg("min")} ${round(daily.temperature_2m_min[0])}°`;
   $("#heroMetrics").innerHTML = [
-    [msg("windShort"), `${round(current.wind_speed_10m)} km/h`],
+    [msg("windShort"), `${round(current.wind_speed_10m)} ${unit("speed")}`],
     [msg("rainShort"), `${daily.precipitation_probability_max[0]}%`],
     [msg("uvShort"), `${daily.uv_index_max[0]}`],
   ]
@@ -747,16 +846,42 @@ function renderCurrent(location, data) {
     .join("");
 }
 
-function renderFavorites() {
-  const holder = $("#favoritesRow");
+function renderFavoritesMenu() {
+  const holder = $("#favoritesList");
   holder.textContent = "";
-  state.favorites.slice(0, 8).forEach((favorite) => {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "favorite-chip";
-    button.textContent = favorite.name;
-    button.addEventListener("click", () => update(favorite));
-    holder.append(button);
+  if (!state.favorites.length) {
+    holder.innerHTML = `<div class="favorites-empty">${msg("favoritesEmpty")}</div>`;
+    return;
+  }
+  state.favorites.forEach((favorite, index) => {
+    const row = document.createElement("article");
+    row.className = "favorite-row";
+    row.innerHTML = `
+      <button class="favorite-open" type="button">
+        <strong>${favorite.name}</strong>
+        <span>${favorite.country || ""}</span>
+      </button>
+      <button class="favorite-delete" type="button" title="${msg("delete")}" aria-label="${msg("delete")}">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M3 6h18" />
+          <path d="M8 6V4h8v2" />
+          <path d="M6 6l1 15h10l1-15" />
+          <path d="M10 11v6" />
+          <path d="M14 11v6" />
+        </svg>
+      </button>
+    `;
+    row.querySelector(".favorite-open").addEventListener("click", () => {
+      closeFavoritesMenu();
+      update(favorite);
+    });
+    row.querySelector(".favorite-delete").addEventListener("click", () => {
+      const [removed] = state.favorites.splice(index, 1);
+      localStorage.setItem("weatherFavorites", JSON.stringify(state.favorites));
+      sendFavoriteToBot("favorite:remove", removed);
+      renderFavoritesMenu();
+    });
+    holder.append(row);
   });
 }
 
@@ -767,20 +892,52 @@ function saveCurrentCity() {
     state.favorites.unshift(location);
     state.favorites = state.favorites.slice(0, 8);
     localStorage.setItem("weatherFavorites", JSON.stringify(state.favorites));
-    renderFavorites();
+    sendFavoriteToBot("favorite:add", location);
+    renderFavoritesMenu();
   }
   $("#condition").textContent = msg("savedCity");
+}
+
+function sendFavoriteToBot(action, location) {
+  if (!window.Telegram?.WebApp?.sendData || !location) return;
+  window.Telegram.WebApp.sendData(
+    JSON.stringify({
+      action,
+      favorite_id: location.id,
+      location: {
+        name: location.name,
+        latitude: Number(location.latitude),
+        longitude: Number(location.longitude),
+        country: location.country || "",
+        timezone: location.timezone || "",
+      },
+    }),
+  );
+}
+
+function openFavoritesMenu() {
+  renderFavoritesMenu();
+  $("#favoritesSheet").hidden = false;
+}
+
+function closeFavoritesMenu() {
+  $("#favoritesSheet").hidden = true;
 }
 
 function alertMessages(data) {
   const current = data.current;
   const daily = data.daily;
   const alerts = [];
-  if (daily.precipitation_probability_max[0] >= 70) alerts.push(`${msg("precipitation")}: ${daily.precipitation_probability_max[0]}%`);
-  if (daily.wind_gusts_10m_max[0] >= 45) alerts.push(`${msg("gusts")}: ${round(daily.wind_gusts_10m_max[0])} km/h`);
-  if (daily.uv_index_max[0] >= 6) alerts.push(`${msg("uv")}: ${daily.uv_index_max[0]}`);
-  if (current.weather_code === 45 || current.weather_code === 48) alerts.push(describe(current.weather_code)[0]);
-  return alerts;
+  if (daily.wind_gusts_10m_max[0] >= 55) alerts.push({ level: 3, text: msg("alertWind") });
+  else if (daily.wind_gusts_10m_max[0] >= 40) alerts.push({ level: 2, text: msg("alertWind") });
+  if (daily.precipitation_probability_max[0] >= 75) alerts.push({ level: 3, text: msg("alertRain") });
+  else if (daily.precipitation_probability_max[0] >= 55) alerts.push({ level: 2, text: msg("alertRain") });
+  if (daily.uv_index_max[0] >= 8) alerts.push({ level: 3, text: msg("alertUv") });
+  else if (daily.uv_index_max[0] >= 6) alerts.push({ level: 2, text: msg("alertUv") });
+  if (current.weather_code === 45 || current.weather_code === 48) alerts.push({ level: 2, text: msg("alertFog") });
+  if (current.apparent_temperature >= 32) alerts.push({ level: 2, text: msg("alertHeat") });
+  if (current.apparent_temperature <= -10) alerts.push({ level: 2, text: msg("alertCold") });
+  return alerts.sort((a, b) => b.level - a.level).slice(0, 3);
 }
 
 function renderAlerts(data) {
@@ -790,8 +947,11 @@ function renderAlerts(data) {
     card.hidden = true;
     return;
   }
+  const maxLevel = Math.max(...alerts.map((item) => item.level));
   card.hidden = false;
-  card.innerHTML = `<h2>${msg("weatherAlert")}</h2><p>${alerts.join(" · ")}</p>`;
+  card.classList.remove("alert-medium", "alert-high");
+  card.classList.add(maxLevel >= 3 ? "alert-high" : "alert-medium");
+  card.innerHTML = `<h2>${msg("weatherAlert")}</h2><p>${alerts.map((item) => item.text).join(" ")}</p>`;
 }
 
 function renderCharts(data) {
@@ -799,7 +959,7 @@ function renderCharts(data) {
   const rain = data.hourly.precipitation_probability.slice(0, 24).map(Number);
   const times = data.hourly.time.slice(0, 24);
   $("#tempChartMeta").textContent = `${Math.min(...temps)}°...${Math.max(...temps)}°`;
-  $("#rainChartMeta").textContent = `${Math.max(...rain)}% max`;
+  $("#rainChartMeta").textContent = `${Math.max(...rain)}% ${unit("max")}`;
   renderLineChart($("#tempChart"), $("#tempTooltip"), temps, times, "°");
   renderBarChart($("#rainChart"), $("#rainTooltip"), rain, times, "%");
 }
@@ -946,10 +1106,10 @@ function renderDaily(data) {
         <div class="day-condition">${description}</div>
         ${detailItem("thermo", msg("tempRange"), `${round(low)}°...${round(high)}°`)}
         ${detailItem("thermo", msg("feels"), `${round(data.daily.apparent_temperature_min[index])}°...${round(data.daily.apparent_temperature_max[index])}°`)}
-        ${detailItem("rain", msg("precipitation"), `${data.daily.precipitation_sum[index]} mm`)}
+        ${detailItem("rain", msg("precipitation"), `${data.daily.precipitation_sum[index]} ${unit("precip")}`)}
         ${detailItem("chance", msg("chance"), `${data.daily.precipitation_probability_max[index]}%`)}
-        ${detailItem("wind", msg("maxWind"), `${round(data.daily.wind_speed_10m_max[index])} km/h`)}
-        ${detailItem("gust", msg("gustsShort"), `${round(data.daily.wind_gusts_10m_max[index])} km/h`)}
+        ${detailItem("wind", msg("maxWind"), `${round(data.daily.wind_speed_10m_max[index])} ${unit("speed")}`)}
+        ${detailItem("gust", msg("gustsShort"), `${round(data.daily.wind_gusts_10m_max[index])} ${unit("speed")}`)}
         ${detailItem("uv", msg("uv"), `${data.daily.uv_index_max[index]}`)}
         ${detailItem("sunrise", msg("sunrise"), `${data.daily.sunrise[index].slice(-5)}`)}
         ${detailItem("sunset", msg("sunset"), `${data.daily.sunset[index].slice(-5)}`)}
@@ -1001,25 +1161,25 @@ function renderStats(data) {
     {
       tone: "wind",
       label: msg("wind"),
-      value: `${round(current.wind_speed_10m)} km/h`,
+      value: `${round(current.wind_speed_10m)} ${unit("speed")}`,
       note: windStatus(current.wind_speed_10m),
       progress: clamp(current.wind_speed_10m / 60, 0, 1),
       details: [
-        [msg("gustsShort"), `${round(current.wind_gusts_10m)} km/h`],
-        [msg("nextPeak"), `${round(windPeak.value)} km/h`],
-        ["Time", formatHour(windPeak.time)],
+        [msg("gustsShort"), `${round(current.wind_gusts_10m)} ${unit("speed")}`],
+        [msg("nextPeak"), `${round(windPeak.value)} ${unit("speed")}`],
+        [msg("time"), formatHour(windPeak.time)],
       ],
     },
     {
       tone: "pressure",
       label: msg("pressure"),
-      value: `${round(current.pressure_msl)} hPa`,
+      value: `${round(current.pressure_msl)} ${unit("pressure")}`,
       note: pressureStatus(current.pressure_msl),
       progress: clamp((current.pressure_msl - 980) / 70, 0, 1),
       details: [
-        [msg("avgToday"), `${avg(first24("pressure_msl"))} hPa`],
-        [msg("minToday"), `${round(pressureRange.min)} hPa`],
-        [msg("maxToday"), `${round(pressureRange.max)} hPa`],
+        [msg("avgToday"), `${avg(first24("pressure_msl"))} ${unit("pressure")}`],
+        [msg("minToday"), `${round(pressureRange.min)} ${unit("pressure")}`],
+        [msg("maxToday"), `${round(pressureRange.max)} ${unit("pressure")}`],
       ],
     },
     {
@@ -1031,30 +1191,30 @@ function renderStats(data) {
       details: [
         [msg("uvNote"), `${daily.uv_index_max[0]}`],
         [msg("nextPeak"), `${uvPeak.value}`],
-        ["Time", formatHour(uvPeak.time)],
+        [msg("time"), formatHour(uvPeak.time)],
       ],
     },
     {
       tone: "rain",
       label: msg("precipitation"),
-      value: `${daily.precipitation_sum[0]} mm`,
+      value: `${daily.precipitation_sum[0]} ${unit("precip")}`,
       note: `${msg("chance")} ${daily.precipitation_probability_max[0]}%`,
       progress: clamp(daily.precipitation_probability_max[0] / 100, 0, 1),
       details: [
         [msg("chance"), `${daily.precipitation_probability_max[0]}%`],
-        [msg("rain"), `${daily.rain_sum?.[0] ?? 0} mm`],
+        [msg("rain"), `${daily.rain_sum?.[0] ?? 0} ${unit("precip")}`],
         [msg("nextPeak"), `${rainPeak.value}% ${formatHour(rainPeak.time)}`],
       ],
     },
     {
       tone: "visibility",
       label: msg("visibility"),
-      value: `${minVisibility.toFixed(1)} km`,
+      value: `${minVisibility.toFixed(1)} ${unit("distance")}`,
       note: visibilityStatus(minVisibility),
       progress: clamp(minVisibility / 10, 0, 1),
       details: [
-        [msg("minToday"), `${minVisibility.toFixed(1)} km`],
-        [msg("avgToday"), `${(avg(first24("visibility")) / 1000).toFixed(1)} km`],
+        [msg("minToday"), `${minVisibility.toFixed(1)} ${unit("distance")}`],
+        [msg("avgToday"), `${(avg(first24("visibility")) / 1000).toFixed(1)} ${unit("distance")}`],
         [msg("clouds"), `${current.cloud_cover}%`],
       ],
     },
@@ -1256,6 +1416,11 @@ document.querySelectorAll("[data-lang]").forEach((button) => {
 $("#geoButton").addEventListener("click", useBrowserLocation);
 $("#refreshButton").addEventListener("click", () => update());
 $("#saveCityButton").addEventListener("click", saveCurrentCity);
+$("#favoritesMenuButton").addEventListener("click", openFavoritesMenu);
+$("#closeFavoritesButton").addEventListener("click", closeFavoritesMenu);
+$("#favoritesSheet").addEventListener("click", (event) => {
+  if (event.target.id === "favoritesSheet") closeFavoritesMenu();
+});
 window.addEventListener("resize", resizeWeatherCanvas);
 motionQuery.addEventListener?.("change", () => {
   if (motionQuery.matches) {

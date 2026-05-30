@@ -192,18 +192,16 @@ summary {
   background: rgba(255, 255, 255, 0.9);
 }
 
-.favorites-row {
-  min-height: 38px;
+.favorites-menu-button {
+  width: 48px;
+  height: 38px;
   margin-top: 12px;
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: max-content;
-  justify-content: center;
-  gap: 8px;
-  overflow-x: auto;
+  justify-self: center;
+  border-radius: 999px;
+  font-size: 17px;
 }
 
-.favorite-chip,
+.favorites-menu-button,
 .save-city {
   border: 1px solid rgba(255, 255, 255, 0.18);
   color: var(--text);
@@ -212,19 +210,157 @@ summary {
   cursor: pointer;
 }
 
-.favorite-chip {
-  min-height: 34px;
-  border-radius: 999px;
-  padding: 0 12px;
-  white-space: nowrap;
-}
-
 .save-city {
   width: 46px;
   height: 46px;
   margin-top: 14px;
   border-radius: 50%;
   font-size: 18px;
+}
+
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  align-items: end;
+  background: rgba(0, 0, 0, 0.32);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+
+.sheet-backdrop[hidden] {
+  display: none;
+}
+
+.sheet {
+  width: min(720px, 100%);
+  max-height: min(72vh, 620px);
+  margin: 0 auto;
+  border-radius: 28px 28px 0 0;
+  padding: 10px 16px calc(env(safe-area-inset-bottom) + 18px);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-bottom: 0;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.07)),
+    rgba(18, 28, 48, 0.86);
+  -webkit-backdrop-filter: blur(30px) saturate(140%);
+  backdrop-filter: blur(30px) saturate(140%);
+  box-shadow: 0 -24px 60px rgba(0, 0, 0, 0.32);
+  animation: sheetUp 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.sheet-handle {
+  width: 42px;
+  height: 5px;
+  margin: 0 auto 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.sheet-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.sheet-header h2 {
+  margin: 0;
+  color: #ffffff;
+  font-size: 18px;
+  text-transform: none;
+}
+
+.sheet-close {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+  display: grid;
+  place-items: center;
+}
+
+.sheet-close svg {
+  width: 19px;
+  height: 19px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+}
+
+.favorites-list {
+  display: grid;
+  gap: 10px;
+  overflow-y: auto;
+  max-height: calc(min(72vh, 620px) - 92px);
+}
+
+.favorite-row {
+  min-height: 58px;
+  display: grid;
+  grid-template-columns: 1fr 42px;
+  gap: 10px;
+  align-items: center;
+  border-radius: 18px;
+  padding: 8px 8px 8px 14px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.favorite-open,
+.favorite-delete {
+  border: 0;
+  color: #ffffff;
+  background: transparent;
+}
+
+.favorite-open {
+  min-width: 0;
+  text-align: left;
+}
+
+.favorite-open strong,
+.favorite-open span {
+  display: block;
+}
+
+.favorite-open strong {
+  font-size: 16px;
+}
+
+.favorite-open span {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.favorite-delete {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 92, 92, 0.18);
+}
+
+.favorite-delete svg {
+  width: 19px;
+  height: 19px;
+  fill: none;
+  stroke: #ffb7b7;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.favorites-empty {
+  padding: 18px 8px 24px;
+  color: var(--muted);
+  text-align: center;
 }
 
 .icon-button,
@@ -458,6 +594,20 @@ h1 {
   -webkit-backdrop-filter: blur(24px);
   backdrop-filter: blur(24px);
   box-shadow: 0 18px 44px rgba(0, 0, 0, 0.18);
+}
+
+.alert-card.alert-medium {
+  border-color: rgba(255, 214, 111, 0.4);
+  background:
+    linear-gradient(145deg, rgba(255, 214, 111, 0.24), rgba(255, 255, 255, 0.07)),
+    rgba(42, 35, 22, 0.58);
+}
+
+.alert-card.alert-high {
+  border-color: rgba(255, 130, 92, 0.48);
+  background:
+    linear-gradient(145deg, rgba(255, 130, 92, 0.28), rgba(255, 255, 255, 0.07)),
+    rgba(48, 24, 24, 0.62);
 }
 
 .alert-card h2 {
@@ -936,6 +1086,17 @@ h2 {
   }
   50% {
     transform: translateY(-8px);
+  }
+}
+
+@keyframes sheetUp {
+  from {
+    opacity: 0;
+    transform: translateY(22px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 

@@ -38,7 +38,7 @@
           <button type="button" data-lang="kk">KZ</button>
           <button type="button" data-lang="en">EN</button>
         </div>
-        <div class="favorites-row" id="favoritesRow"></div>
+        <button class="favorites-menu-button" id="favoritesMenuButton" type="button">⭐</button>
 
         <div class="current">
           <div class="weather-orb" aria-hidden="true">
@@ -100,6 +100,22 @@
         <span class="hour-rain"></span>
       </article>
     </template>
+
+    <div class="sheet-backdrop" id="favoritesSheet" hidden>
+      <section class="sheet" role="dialog" aria-modal="true" aria-labelledby="favoritesTitle">
+        <div class="sheet-handle"></div>
+        <header class="sheet-header">
+          <h2 id="favoritesTitle">Избранное</h2>
+          <button class="sheet-close" id="closeFavoritesButton" type="button" aria-label="Закрыть">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M18 6 6 18" />
+              <path d="m6 6 12 12" />
+            </svg>
+          </button>
+        </header>
+        <div class="favorites-list" id="favoritesList"></div>
+      </section>
+    </div>
 
     <script src="./app.js"></script>
     <script type="module" src="./weather3d.js"></script>
