@@ -1,0 +1,418 @@
+const geocodingUrl = "https://geocoding-api.open-meteo.com/v1/search";
+const forecastUrl = "https://api.open-meteo.com/v1/forecast";
+
+const messages = {
+  ru: {
+    city: "Город",
+    loading: "Загрузка...",
+    getting: "Получаем прогноз",
+    updating: "Обновляем прогноз",
+    hourly: "По часам",
+    daily: "Прогноз на 7 дней",
+    max: "Макс.",
+    min: "Мин.",
+    now: "Сейчас",
+    today: "Сегодня",
+    cityNotFound: "Город не найден",
+    forecastError: "Не удалось получить прогноз",
+    geolocationMissing: "Геолокация недоступна",
+    geolocationDenied: "Разрешите доступ к геолокации",
+    myLocation: "Моя геолокация",
+    feels: "Ощущается",
+    feelsNote: "С учетом ветра и влажности",
+    humidity: "Влажность",
+    humidityAvg: "Средняя за сутки",
+    wind: "Ветер",
+    gusts: "Порывы до",
+    pressure: "Давление",
+    pressureAvg: "Среднее за сутки",
+    uv: "UV индекс",
+    uvNote: "Максимум сегодня",
+    precipitation: "Осадки",
+    chance: "Шанс до",
+    visibility: "Видимость",
+    visibilityNote: "Минимум за 24 часа",
+    sun: "Солнце",
+    sunrise: "Восход",
+    windShort: "Ветер",
+    rainShort: "Осадки",
+    uvShort: "UV",
+  },
+  kk: {
+    city: "Қала",
+    loading: "Жүктелуде...",
+    getting: "Болжам алынуда",
+    updating: "Болжам жаңартылуда",
+    hourly: "Сағат бойынша",
+    daily: "7 күндік болжам",
+    max: "Макс.",
+    min: "Мин.",
+    now: "Қазір",
+    today: "Бүгін",
+    cityNotFound: "Қала табылмады",
+    forecastError: "Болжам алынбады",
+    geolocationMissing: "Геолокация қолжетімсіз",
+    geolocationDenied: "Геолокацияға рұқсат беріңіз",
+    myLocation: "Менің геолокациям",
+    feels: "Сезіледі",
+    feelsNote: "Жел мен ылғалдылық ескерілген",
+    humidity: "Ылғалдылық",
+    humidityAvg: "Тәуліктік орташа",
+    wind: "Жел",
+    gusts: "Екпіні",
+    pressure: "Қысым",
+    pressureAvg: "Тәуліктік орташа",
+    uv: "UV индекс",
+    uvNote: "Бүгінгі максимум",
+    precipitation: "Жауын-шашын",
+    chance: "Ықтималдығы",
+    visibility: "Көріну",
+    visibilityNote: "24 сағаттағы минимум",
+    sun: "Күн",
+    sunrise: "Күн шығуы",
+    windShort: "Жел",
+    rainShort: "Жауын",
+    uvShort: "UV",
+  },
+  en: {
+    city: "City",
+    loading: "Loading...",
+    getting: "Getting forecast",
+    updating: "Updating forecast",
+    hourly: "Hourly",
+    daily: "7-day forecast",
+    max: "Max",
+    min: "Min",
+    now: "Now",
+    today: "Today",
+    cityNotFound: "City not found",
+    forecastError: "Could not get forecast",
+    geolocationMissing: "Geolocation is unavailable",
+    geolocationDenied: "Allow geolocation access",
+    myLocation: "My location",
+    feels: "Feels like",
+    feelsNote: "With wind and humidity",
+    humidity: "Humidity",
+    humidityAvg: "Daily average",
+    wind: "Wind",
+    gusts: "Gusts up to",
+    pressure: "Pressure",
+    pressureAvg: "Daily average",
+    uv: "UV index",
+    uvNote: "Today maximum",
+    precipitation: "Precipitation",
+    chance: "Chance up to",
+    visibility: "Visibility",
+    visibilityNote: "Minimum for 24 hours",
+    sun: "Sun",
+    sunrise: "Sunrise",
+    windShort: "Wind",
+    rainShort: "Rain",
+    uvShort: "UV",
+  },
+};
+
+const codes = {
+  0: { ru: ["Ясно", "☀️"], kk: ["Ашық", "☀️"], en: ["Clear", "☀️"] },
+  1: { ru: ["Преимущественно ясно", "🌤"], kk: ["Көбіне ашық", "🌤"], en: ["Mostly clear", "🌤"] },
+  2: { ru: ["Переменная облачность", "⛅"], kk: ["Ауыспалы бұлтты", "⛅"], en: ["Partly cloudy", "⛅"] },
+  3: { ru: ["Пасмурно", "☁️"], kk: ["Бұлтты", "☁️"], en: ["Overcast", "☁️"] },
+  45: { ru: ["Туман", "🌫"], kk: ["Тұман", "🌫"], en: ["Fog", "🌫"] },
+  48: { ru: ["Изморозь", "🌫"], kk: ["Қыраулы тұман", "🌫"], en: ["Rime fog", "🌫"] },
+  51: { ru: ["Легкая морось", "🌦"], kk: ["Әлсіз сіркіреме", "🌦"], en: ["Light drizzle", "🌦"] },
+  53: { ru: ["Морось", "🌦"], kk: ["Сіркіреме", "🌦"], en: ["Drizzle", "🌦"] },
+  55: { ru: ["Сильная морось", "🌧"], kk: ["Қатты сіркіреме", "🌧"], en: ["Dense drizzle", "🌧"] },
+  61: { ru: ["Небольшой дождь", "🌧"], kk: ["Әлсіз жаңбыр", "🌧"], en: ["Slight rain", "🌧"] },
+  63: { ru: ["Дождь", "🌧"], kk: ["Жаңбыр", "🌧"], en: ["Rain", "🌧"] },
+  65: { ru: ["Сильный дождь", "🌧"], kk: ["Қатты жаңбыр", "🌧"], en: ["Heavy rain", "🌧"] },
+  71: { ru: ["Небольшой снег", "🌨"], kk: ["Әлсіз қар", "🌨"], en: ["Slight snow", "🌨"] },
+  73: { ru: ["Снег", "🌨"], kk: ["Қар", "🌨"], en: ["Snow", "🌨"] },
+  75: { ru: ["Сильный снег", "❄️"], kk: ["Қатты қар", "❄️"], en: ["Heavy snow", "❄️"] },
+  80: { ru: ["Ливни", "🌦"], kk: ["Нөсер", "🌦"], en: ["Rain showers", "🌦"] },
+  81: { ru: ["Сильные ливни", "🌧"], kk: ["Қатты нөсер", "🌧"], en: ["Heavy rain showers", "🌧"] },
+  82: { ru: ["Очень сильные ливни", "⛈"], kk: ["Өте қатты нөсер", "⛈"], en: ["Violent rain showers", "⛈"] },
+  95: { ru: ["Гроза", "⛈"], kk: ["Найзағай", "⛈"], en: ["Thunderstorm", "⛈"] },
+  96: { ru: ["Гроза с градом", "⛈"], kk: ["Бұршақты найзағай", "⛈"], en: ["Thunderstorm with hail", "⛈"] },
+  99: { ru: ["Сильная гроза с градом", "⛈"], kk: ["Қатты бұршақты найзағай", "⛈"], en: ["Heavy thunderstorm with hail", "⛈"] },
+};
+
+const telegramLang = window.Telegram?.WebApp?.initDataUnsafe?.user?.language_code || "";
+const initialLang = telegramLang.startsWith("kk") || telegramLang.startsWith("kz")
+  ? "kk"
+  : telegramLang.startsWith("en")
+    ? "en"
+    : localStorage.getItem("weatherLang") || "ru";
+
+const state = {
+  lang: ["ru", "kk", "en"].includes(initialLang) ? initialLang : "ru",
+  location: { name: "Almaty", latitude: 43.25, longitude: 76.95, country: "Kazakhstan" },
+  data: null,
+};
+
+const $ = (selector) => document.querySelector(selector);
+const round = (value) => Math.round(Number(value));
+const msg = (key) => messages[state.lang][key];
+
+function describe(code) {
+  return codes[code]?.[state.lang] || codes[code]?.ru || ["Unknown", "🌡"];
+}
+
+function themeForCode(code) {
+  if ([0, 1].includes(code)) return "theme-clear";
+  if ([2, 3, 45, 48].includes(code)) return "theme-cloudy";
+  if ([71, 73, 75, 77, 85, 86].includes(code)) return "theme-snow";
+  if ([95, 96, 99].includes(code)) return "theme-storm";
+  if ([51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82].includes(code)) return "theme-rain";
+  return "theme-clear";
+}
+
+function applyTheme(code) {
+  document.body.classList.remove("theme-clear", "theme-cloudy", "theme-rain", "theme-snow", "theme-storm");
+  document.body.classList.add(themeForCode(code));
+}
+
+function locale() {
+  return state.lang === "kk" ? "kk-KZ" : state.lang === "en" ? "en-US" : "ru-RU";
+}
+
+function hourLabel(iso) {
+  return new Date(iso).toLocaleTimeString(locale(), { hour: "2-digit", minute: "2-digit" });
+}
+
+function dayLabel(iso) {
+  return new Date(`${iso}T12:00:00`).toLocaleDateString(locale(), { weekday: "short" });
+}
+
+function applyStaticText() {
+  document.documentElement.lang = state.lang;
+  $("#cityInput").placeholder = msg("city");
+  $("#locationName").textContent = state.data ? $("#locationName").textContent : msg("loading");
+  $("#condition").textContent = state.data ? $("#condition").textContent : msg("getting");
+  $("#hourlyTitle").textContent = msg("hourly");
+  $("#dailyTitle").textContent = msg("daily");
+  document.querySelectorAll("[data-lang]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.lang === state.lang);
+  });
+}
+
+async function geocode(city) {
+  const language = state.lang === "en" ? "en" : "ru";
+  const params = new URLSearchParams({ name: city, count: "1", language, format: "json" });
+  const response = await fetch(`${geocodingUrl}?${params}`);
+  if (!response.ok) throw new Error(msg("cityNotFound"));
+  const data = await response.json();
+  const item = data.results?.[0];
+  if (!item) throw new Error(msg("cityNotFound"));
+  return {
+    name: item.name,
+    latitude: item.latitude,
+    longitude: item.longitude,
+    country: item.country,
+  };
+}
+
+async function loadForecast(location) {
+  const params = new URLSearchParams({
+    latitude: location.latitude,
+    longitude: location.longitude,
+    timezone: "auto",
+    forecast_days: "7",
+    current: [
+      "temperature_2m",
+      "relative_humidity_2m",
+      "apparent_temperature",
+      "precipitation",
+      "weather_code",
+      "cloud_cover",
+      "pressure_msl",
+      "wind_speed_10m",
+      "wind_gusts_10m",
+    ].join(","),
+    hourly: [
+      "temperature_2m",
+      "relative_humidity_2m",
+      "precipitation_probability",
+      "precipitation",
+      "weather_code",
+      "pressure_msl",
+      "visibility",
+      "uv_index",
+      "wind_speed_10m",
+    ].join(","),
+    daily: [
+      "weather_code",
+      "temperature_2m_max",
+      "temperature_2m_min",
+      "sunrise",
+      "sunset",
+      "uv_index_max",
+      "precipitation_sum",
+      "precipitation_probability_max",
+      "wind_speed_10m_max",
+      "wind_gusts_10m_max",
+    ].join(","),
+  });
+  const response = await fetch(`${forecastUrl}?${params}`);
+  if (!response.ok) throw new Error(msg("forecastError"));
+  return response.json();
+}
+
+function renderCurrent(location, data) {
+  const current = data.current;
+  const daily = data.daily;
+  const [description, icon] = describe(current.weather_code);
+  applyTheme(current.weather_code);
+  $("#heroIcon").textContent = icon;
+  $("#locationName").textContent = location.country ? `${location.name}, ${location.country}` : location.name;
+  $("#temperature").textContent = `${round(current.temperature_2m)}°`;
+  $("#condition").textContent = description;
+  $("#range").textContent = `${msg("max")} ${round(daily.temperature_2m_max[0])}° ${msg("min")} ${round(daily.temperature_2m_min[0])}°`;
+  $("#heroMetrics").innerHTML = [
+    [msg("windShort"), `${round(current.wind_speed_10m)} km/h`],
+    [msg("rainShort"), `${daily.precipitation_probability_max[0]}%`],
+    [msg("uvShort"), `${daily.uv_index_max[0]}`],
+  ]
+    .map(
+      ([label, value]) => `
+        <div class="metric-pill">
+          <span class="metric-label">${label}</span>
+          <span class="metric-value">${value}</span>
+        </div>
+      `,
+    )
+    .join("");
+}
+
+function renderHourly(data) {
+  const holder = $("#hourly");
+  const template = $("#hourTemplate");
+  holder.textContent = "";
+  data.hourly.time.slice(0, 24).forEach((time, index) => {
+    const node = template.content.cloneNode(true);
+    const [, icon] = describe(data.hourly.weather_code[index]);
+    node.querySelector(".hour").textContent = index === 0 ? msg("now") : hourLabel(time);
+    node.querySelector(".hour-icon").textContent = icon;
+    node.querySelector(".hour-temp").textContent = `${round(data.hourly.temperature_2m[index])}°`;
+    node.querySelector(".hour-rain").textContent = `${data.hourly.precipitation_probability[index]}%`;
+    holder.append(node);
+  });
+}
+
+function renderDaily(data) {
+  const holder = $("#daily");
+  holder.textContent = "";
+  const max = Math.max(...data.daily.temperature_2m_max);
+  const min = Math.min(...data.daily.temperature_2m_min);
+  data.daily.time.forEach((time, index) => {
+    const low = data.daily.temperature_2m_min[index];
+    const high = data.daily.temperature_2m_max[index];
+    const [, icon] = describe(data.daily.weather_code[index]);
+    const width = Math.max(18, ((high - low) / Math.max(1, max - min)) * 100);
+    const row = document.createElement("article");
+    row.className = "day-row";
+    row.innerHTML = `
+      <strong>${index === 0 ? msg("today") : dayLabel(time)}</strong>
+      <span>${icon}</span>
+      <span class="bar" style="width:${width}%"></span>
+      <span class="daily-meta">${round(low)}° / ${round(high)}°</span>
+    `;
+    holder.append(row);
+  });
+}
+
+function renderStats(data) {
+  const current = data.current;
+  const daily = data.daily;
+  const hourly = data.hourly;
+  const first24 = (key) => hourly[key].slice(0, 24);
+  const avg = (values) => Math.round(values.reduce((sum, value) => sum + Number(value), 0) / values.length);
+  const stats = [
+    [msg("feels"), `${round(current.apparent_temperature)}°`, msg("feelsNote")],
+    [msg("humidity"), `${current.relative_humidity_2m}%`, `${msg("humidityAvg")}: ${avg(first24("relative_humidity_2m"))}%`],
+    [msg("wind"), `${round(current.wind_speed_10m)} km/h`, `${msg("gusts")} ${round(current.wind_gusts_10m)} km/h`],
+    [msg("pressure"), `${round(current.pressure_msl)} hPa`, `${msg("pressureAvg")}: ${avg(first24("pressure_msl"))} hPa`],
+    [msg("uv"), `${daily.uv_index_max[0]}`, msg("uvNote")],
+    [msg("precipitation"), `${daily.precipitation_sum[0]} mm`, `${msg("chance")} ${daily.precipitation_probability_max[0]}%`],
+    [msg("visibility"), `${(Math.min(...first24("visibility")) / 1000).toFixed(1)} km`, msg("visibilityNote")],
+    [msg("sun"), daily.sunset[0].slice(-5), `${msg("sunrise")} ${daily.sunrise[0].slice(-5)}`],
+  ];
+  $("#stats").innerHTML = stats
+    .map(
+      ([label, value, note]) => `
+        <article>
+          <div class="stat-label">${label}</div>
+          <div class="stat-value">${value}</div>
+          <div class="stat-note">${note}</div>
+        </article>
+      `,
+    )
+    .join("");
+}
+
+function renderAll() {
+  applyStaticText();
+  if (!state.data) return;
+  renderCurrent(state.location, state.data);
+  renderHourly(state.data);
+  renderDaily(state.data);
+  renderStats(state.data);
+}
+
+async function update(location = state.location) {
+  try {
+    state.location = location;
+    $("#condition").textContent = msg("updating");
+    state.data = await loadForecast(location);
+    renderAll();
+  } catch (error) {
+    $("#condition").textContent = error.message || msg("forecastError");
+  }
+}
+
+function useBrowserLocation() {
+  if (!navigator.geolocation) {
+    $("#condition").textContent = msg("geolocationMissing");
+    return;
+  }
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+      update({
+        name: msg("myLocation"),
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+      });
+    },
+    () => {
+      $("#condition").textContent = msg("geolocationDenied");
+    },
+    { enableHighAccuracy: true, timeout: 12000 },
+  );
+}
+
+$("#searchForm").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const city = $("#cityInput").value.trim();
+  if (!city) return;
+  try {
+    await update(await geocode(city));
+  } catch (error) {
+    $("#condition").textContent = error.message || msg("cityNotFound");
+  }
+});
+
+document.querySelectorAll("[data-lang]").forEach((button) => {
+  button.addEventListener("click", () => {
+    state.lang = button.dataset.lang;
+    localStorage.setItem("weatherLang", state.lang);
+    renderAll();
+  });
+});
+
+$("#geoButton").addEventListener("click", useBrowserLocation);
+$("#refreshButton").addEventListener("click", () => update());
+
+window.Telegram?.WebApp?.ready();
+window.Telegram?.WebApp?.expand();
+
+applyStaticText();
+update();
