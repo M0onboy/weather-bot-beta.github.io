@@ -26,6 +26,9 @@ const messages = {
     gusts: "Порывы до",
     pressure: "Давление",
     pressureAvg: "Среднее за сутки",
+    temperature: "Температура",
+    clouds: "Облачность",
+    rain: "Дождь",
     uv: "UV индекс",
     uvNote: "Максимум сегодня",
     precipitation: "Осадки",
@@ -42,6 +45,23 @@ const messages = {
     tempRange: "Диапазон",
     maxWind: "Ветер до",
     gustsShort: "Порывы",
+    low: "Низкий",
+    normal: "Норма",
+    high: "Высокий",
+    comfortDry: "Сухо",
+    comfortNormal: "Комфортно",
+    comfortHumid: "Влажно",
+    weak: "Слабый",
+    moderate: "Умеренный",
+    strong: "Сильный",
+    good: "Хорошая",
+    reduced: "Сниженная",
+    poor: "Плохая",
+    dayLength: "Длина дня",
+    minToday: "Мин.",
+    maxToday: "Макс.",
+    avgToday: "Среднее",
+    nextPeak: "Пик в ближайшие часы",
   },
   kk: {
     city: "Қала",
@@ -67,6 +87,9 @@ const messages = {
     gusts: "Екпіні",
     pressure: "Қысым",
     pressureAvg: "Тәуліктік орташа",
+    temperature: "Температура",
+    clouds: "Бұлттылық",
+    rain: "Жаңбыр",
     uv: "UV индекс",
     uvNote: "Бүгінгі максимум",
     precipitation: "Жауын-шашын",
@@ -83,6 +106,23 @@ const messages = {
     tempRange: "Аралық",
     maxWind: "Жел дейін",
     gustsShort: "Екпіні",
+    low: "Төмен",
+    normal: "Қалыпты",
+    high: "Жоғары",
+    comfortDry: "Құрғақ",
+    comfortNormal: "Жайлы",
+    comfortHumid: "Ылғалды",
+    weak: "Әлсіз",
+    moderate: "Орташа",
+    strong: "Қатты",
+    good: "Жақсы",
+    reduced: "Төмендеген",
+    poor: "Нашар",
+    dayLength: "Күн ұзақтығы",
+    minToday: "Мин.",
+    maxToday: "Макс.",
+    avgToday: "Орташа",
+    nextPeak: "Жақын сағаттардағы максимум",
   },
   en: {
     city: "City",
@@ -108,6 +148,9 @@ const messages = {
     gusts: "Gusts up to",
     pressure: "Pressure",
     pressureAvg: "Daily average",
+    temperature: "Temperature",
+    clouds: "Cloud cover",
+    rain: "Rain",
     uv: "UV index",
     uvNote: "Today maximum",
     precipitation: "Precipitation",
@@ -124,6 +167,23 @@ const messages = {
     tempRange: "Range",
     maxWind: "Wind up to",
     gustsShort: "Gusts",
+    low: "Low",
+    normal: "Normal",
+    high: "High",
+    comfortDry: "Dry",
+    comfortNormal: "Comfortable",
+    comfortHumid: "Humid",
+    weak: "Light",
+    moderate: "Moderate",
+    strong: "Strong",
+    good: "Good",
+    reduced: "Reduced",
+    poor: "Poor",
+    dayLength: "Day length",
+    minToday: "Min",
+    maxToday: "Max",
+    avgToday: "Average",
+    nextPeak: "Next-hours peak",
   },
 };
 
@@ -481,6 +541,70 @@ function dayLabel(iso) {
   return new Date(`${iso}T12:00:00`).toLocaleDateString(locale(), { weekday: "short" });
 }
 
+function formatHour(iso) {
+  return new Date(iso).toLocaleTimeString(locale(), { hour: "2-digit", minute: "2-digit" });
+}
+
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function minMax(values) {
+  return {
+    min: Math.min(...values.map(Number)),
+    max: Math.max(...values.map(Number)),
+  };
+}
+
+function hourPeak(hourly, key, count = 24) {
+  const values = hourly[key].slice(0, count).map(Number);
+  let index = 0;
+  values.forEach((value, currentIndex) => {
+    if (value > values[index]) index = currentIndex;
+  });
+  return { value: values[index], time: hourly.time[index] };
+}
+
+function pressureStatus(value) {
+  if (value < 1005) return msg("low");
+  if (value > 1025) return msg("high");
+  return msg("normal");
+}
+
+function humidityStatus(value) {
+  if (value < 35) return msg("comfortDry");
+  if (value > 70) return msg("comfortHumid");
+  return msg("comfortNormal");
+}
+
+function windStatus(value) {
+  if (value < 12) return msg("weak");
+  if (value < 30) return msg("moderate");
+  return msg("strong");
+}
+
+function uvStatus(value) {
+  if (value < 3) return msg("low");
+  if (value < 6) return msg("moderate");
+  if (value < 8) return msg("high");
+  return "Very high";
+}
+
+function visibilityStatus(valueKm) {
+  if (valueKm >= 10) return msg("good");
+  if (valueKm >= 4) return msg("reduced");
+  return msg("poor");
+}
+
+function dayLength(sunrise, sunset) {
+  const start = new Date(sunrise);
+  const end = new Date(sunset);
+  const minutes = Math.max(0, Math.round((end - start) / 60000));
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return `${hours}h ${String(rest).padStart(2, "0")}m`;
+}
+
 function applyStaticText() {
   document.documentElement.lang = state.lang;
   $("#cityInput").placeholder = msg("city");
@@ -659,27 +783,128 @@ function renderStats(data) {
   const hourly = data.hourly;
   const first24 = (key) => hourly[key].slice(0, 24);
   const avg = (values) => Math.round(values.reduce((sum, value) => sum + Number(value), 0) / values.length);
+  const humidityRange = minMax(first24("relative_humidity_2m"));
+  const pressureRange = minMax(first24("pressure_msl"));
+  const windPeak = hourPeak(hourly, "wind_speed_10m");
+  const rainPeak = hourPeak(hourly, "precipitation_probability");
+  const uvPeak = hourPeak(hourly, "uv_index");
+  const minVisibility = Math.min(...first24("visibility")) / 1000;
+  const feelsDiff = round(current.apparent_temperature - current.temperature_2m);
   const stats = [
-    ["thermo", msg("feels"), `${round(current.apparent_temperature)}°`, msg("feelsNote")],
-    ["humidity", msg("humidity"), `${current.relative_humidity_2m}%`, `${msg("humidityAvg")}: ${avg(first24("relative_humidity_2m"))}%`],
-    ["wind", msg("wind"), `${round(current.wind_speed_10m)} km/h`, `${msg("gusts")} ${round(current.wind_gusts_10m)} km/h`],
-    ["pressure", msg("pressure"), `${round(current.pressure_msl)} hPa`, `${msg("pressureAvg")}: ${avg(first24("pressure_msl"))} hPa`],
-    ["uv", msg("uv"), `${daily.uv_index_max[0]}`, msg("uvNote")],
-    ["rain", msg("precipitation"), `${daily.precipitation_sum[0]} mm`, `${msg("chance")} ${daily.precipitation_probability_max[0]}%`],
-    ["visibility", msg("visibility"), `${(Math.min(...first24("visibility")) / 1000).toFixed(1)} km`, msg("visibilityNote")],
-    ["sun", msg("sun"), daily.sunset[0].slice(-5), `${msg("sunrise")} ${daily.sunrise[0].slice(-5)}`],
+    {
+      tone: "thermo",
+      label: msg("feels"),
+      value: `${round(current.apparent_temperature)}°`,
+      note: msg("feelsNote"),
+      progress: clamp((current.apparent_temperature + 30) / 70, 0, 1),
+      details: [
+        [msg("temperature"), `${round(current.temperature_2m)}°`],
+        [msg("feels"), `${round(current.apparent_temperature)}°`],
+        ["Δ", `${feelsDiff > 0 ? "+" : ""}${feelsDiff}°`],
+      ],
+    },
+    {
+      tone: "humidity",
+      label: msg("humidity"),
+      value: `${current.relative_humidity_2m}%`,
+      note: humidityStatus(current.relative_humidity_2m),
+      progress: clamp(current.relative_humidity_2m / 100, 0, 1),
+      details: [
+        [msg("avgToday"), `${avg(first24("relative_humidity_2m"))}%`],
+        [msg("minToday"), `${humidityRange.min}%`],
+        [msg("maxToday"), `${humidityRange.max}%`],
+      ],
+    },
+    {
+      tone: "wind",
+      label: msg("wind"),
+      value: `${round(current.wind_speed_10m)} km/h`,
+      note: windStatus(current.wind_speed_10m),
+      progress: clamp(current.wind_speed_10m / 60, 0, 1),
+      details: [
+        [msg("gustsShort"), `${round(current.wind_gusts_10m)} km/h`],
+        [msg("nextPeak"), `${round(windPeak.value)} km/h`],
+        ["Time", formatHour(windPeak.time)],
+      ],
+    },
+    {
+      tone: "pressure",
+      label: msg("pressure"),
+      value: `${round(current.pressure_msl)} hPa`,
+      note: pressureStatus(current.pressure_msl),
+      progress: clamp((current.pressure_msl - 980) / 70, 0, 1),
+      details: [
+        [msg("avgToday"), `${avg(first24("pressure_msl"))} hPa`],
+        [msg("minToday"), `${round(pressureRange.min)} hPa`],
+        [msg("maxToday"), `${round(pressureRange.max)} hPa`],
+      ],
+    },
+    {
+      tone: "uv",
+      label: msg("uv"),
+      value: `${daily.uv_index_max[0]}`,
+      note: uvStatus(daily.uv_index_max[0]),
+      progress: clamp(daily.uv_index_max[0] / 11, 0, 1),
+      details: [
+        [msg("uvNote"), `${daily.uv_index_max[0]}`],
+        [msg("nextPeak"), `${uvPeak.value}`],
+        ["Time", formatHour(uvPeak.time)],
+      ],
+    },
+    {
+      tone: "rain",
+      label: msg("precipitation"),
+      value: `${daily.precipitation_sum[0]} mm`,
+      note: `${msg("chance")} ${daily.precipitation_probability_max[0]}%`,
+      progress: clamp(daily.precipitation_probability_max[0] / 100, 0, 1),
+      details: [
+        [msg("chance"), `${daily.precipitation_probability_max[0]}%`],
+        [msg("rain"), `${daily.rain_sum?.[0] ?? 0} mm`],
+        [msg("nextPeak"), `${rainPeak.value}% ${formatHour(rainPeak.time)}`],
+      ],
+    },
+    {
+      tone: "visibility",
+      label: msg("visibility"),
+      value: `${minVisibility.toFixed(1)} km`,
+      note: visibilityStatus(minVisibility),
+      progress: clamp(minVisibility / 10, 0, 1),
+      details: [
+        [msg("minToday"), `${minVisibility.toFixed(1)} km`],
+        [msg("avgToday"), `${(avg(first24("visibility")) / 1000).toFixed(1)} km`],
+        [msg("clouds"), `${current.cloud_cover}%`],
+      ],
+    },
+    {
+      tone: "sun",
+      label: msg("sun"),
+      value: daily.sunset[0].slice(-5),
+      note: `${msg("sunrise")} ${daily.sunrise[0].slice(-5)}`,
+      progress: 0.7,
+      details: [
+        [msg("sunrise"), daily.sunrise[0].slice(-5)],
+        [msg("sunset"), daily.sunset[0].slice(-5)],
+        [msg("dayLength"), dayLength(daily.sunrise[0], daily.sunset[0])],
+      ],
+    },
   ];
   $("#stats").innerHTML = stats
     .map(
-      ([tone, label, value, note]) => `
-        <article class="stat-${tone}">
-          <div class="stat-head">
-            <span class="stat-icon">${uiIcon(tone)}</span>
-            <span class="stat-label">${label}</span>
+      ({ tone, label, value, note, progress, details }) => `
+        <details class="stat-card stat-${tone}">
+          <summary>
+            <div class="stat-head">
+              <span class="stat-icon">${uiIcon(tone)}</span>
+              <span class="stat-label">${label}</span>
+            </div>
+            <div class="stat-value">${value}</div>
+            <div class="stat-note">${note}</div>
+            <div class="stat-meter"><span style="width:${Math.round(progress * 100)}%"></span></div>
+          </summary>
+          <div class="stat-details">
+            ${details.map(([detailLabel, detailValue]) => `<div><span>${detailLabel}</span><strong>${detailValue}</strong></div>`).join("")}
           </div>
-          <div class="stat-value">${value}</div>
-          <div class="stat-note">${note}</div>
-        </article>
+        </details>
       `,
     )
     .join("");
