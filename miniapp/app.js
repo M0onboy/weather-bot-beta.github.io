@@ -775,6 +775,7 @@ function renderDaily(data) {
     `;
     holder.append(card);
   });
+  setupAnimatedDetails(holder);
 }
 
 function renderStats(data) {
@@ -908,6 +909,87 @@ function renderStats(data) {
       `,
     )
     .join("");
+  setupAnimatedDetails($("#stats"));
+}
+
+function setupAnimatedDetails(root) {
+  root.querySelectorAll("details").forEach((details) => {
+    const summary = details.querySelector("summary");
+    if (!summary || details.dataset.animated === "true") return;
+    details.dataset.animated = "true";
+
+    summary.addEventListener("click", (event) => {
+      event.preventDefault();
+      if (details.dataset.animating === "true") return;
+      toggleDetails(details);
+    });
+  });
+}
+
+function toggleDetails(details) {
+  const summary = details.querySelector("summary");
+  if (!summary) return;
+
+  const startHeightValue = details.getBoundingClientRect().height;
+  const startHeight = `${startHeightValue}px`;
+  details.dataset.animating = "true";
+  details.style.overflow = "hidden";
+  details.style.height = startHeight;
+
+  if (details.open) {
+    const endHeight = `${summary.getBoundingClientRect().height + getVerticalPadding(details)}px`;
+    animateDetailsHeight(details, startHeight, endHeight, () => {
+      details.open = false;
+      clearDetailsAnimation(details);
+    });
+    return;
+  }
+
+  details.open = true;
+  requestAnimationFrame(() => {
+    const endHeight = `${details.scrollHeight}px`;
+    animateDetailsHeight(details, startHeight, endHeight, () => {
+      clearDetailsAnimation(details);
+    });
+  });
+}
+
+function getVerticalPadding(element) {
+  const styles = window.getComputedStyle(element);
+  return parseFloat(styles.paddingTop) + parseFloat(styles.paddingBottom);
+}
+
+function animateDetailsHeight(details, from, to, onFinish) {
+  details.style.height = from;
+  details.getBoundingClientRect();
+  if (typeof details.animate === "function") {
+    const animation = details.animate(
+      [
+        { height: from, opacity: 0.96 },
+        { height: to, opacity: 1 },
+      ],
+      {
+        duration: 280,
+        easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+      },
+    );
+    animation.onfinish = onFinish;
+    animation.oncancel = onFinish;
+    return;
+  }
+
+  details.style.transition = "height 280ms cubic-bezier(0.22, 1, 0.36, 1)";
+  requestAnimationFrame(() => {
+    details.style.height = to;
+  });
+  window.setTimeout(onFinish, 300);
+}
+
+function clearDetailsAnimation(details) {
+  details.style.height = "";
+  details.style.overflow = "";
+  details.style.transition = "";
+  details.dataset.animating = "false";
 }
 
 function renderAll() {

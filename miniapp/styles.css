@@ -474,7 +474,8 @@ h2 {
   transition:
     background 220ms ease,
     transform 180ms ease,
-    box-shadow 220ms ease;
+    box-shadow 220ms ease,
+    height 280ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .day-card summary {
@@ -572,7 +573,8 @@ h2 {
   transition:
     transform 180ms ease,
     background 220ms ease,
-    box-shadow 220ms ease;
+    box-shadow 220ms ease,
+    height 280ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .stats-grid details summary {
