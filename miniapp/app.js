@@ -64,6 +64,8 @@ const messages = {
     avgToday: "Среднее",
     nextPeak: "Пик в ближайшие часы",
     time: "Время",
+    syncFavorites: "Синхронизировать",
+    syncUnavailable: "Откройте Mini App внутри Telegram",
     saveCity: "Сохранить город",
     savedCity: "Город сохранён",
     favorites: "Избранное",
@@ -147,6 +149,8 @@ const messages = {
     avgToday: "Орташа",
     nextPeak: "Жақын сағаттардағы максимум",
     time: "Уақыт",
+    syncFavorites: "Синхрондау",
+    syncUnavailable: "Mini App қолданбасын Telegram ішінде ашыңыз",
     saveCity: "Қаланы сақтау",
     savedCity: "Қала сақталды",
     favorites: "Таңдаулы",
@@ -230,6 +234,8 @@ const messages = {
     avgToday: "Average",
     nextPeak: "Next-hours peak",
     time: "Time",
+    syncFavorites: "Sync",
+    syncUnavailable: "Open Mini App inside Telegram",
     saveCity: "Save city",
     savedCity: "City saved",
     favorites: "Favorites",
@@ -747,6 +753,7 @@ function applyStaticText() {
   $("#saveCityButton").title = msg("saveCity");
   $("#favoritesMenuButton").title = msg("favorites");
   $("#favoritesTitle").textContent = msg("favorites");
+  $("#syncFavoritesButton").textContent = msg("syncFavorites");
   document.querySelectorAll("[data-lang]").forEach((button) => {
     button.classList.toggle("active", button.dataset.lang === state.lang);
   });
@@ -871,14 +878,13 @@ function renderFavoritesMenu() {
         </svg>
       </button>
     `;
-    row.querySelector(".favorite-open").addEventListener("click", () => {
+    row.querySelector(".favorite-open").addEventListener("click", async () => {
       closeFavoritesMenu();
-      update(favorite);
+      await update(favorite);
     });
     row.querySelector(".favorite-delete").addEventListener("click", () => {
       const [removed] = state.favorites.splice(index, 1);
       localStorage.setItem("weatherFavorites", JSON.stringify(state.favorites));
-      sendFavoriteToBot("favorite:remove", removed);
       renderFavoritesMenu();
     });
     holder.append(row);
@@ -892,25 +898,27 @@ function saveCurrentCity() {
     state.favorites.unshift(location);
     state.favorites = state.favorites.slice(0, 8);
     localStorage.setItem("weatherFavorites", JSON.stringify(state.favorites));
-    sendFavoriteToBot("favorite:add", location);
     renderFavoritesMenu();
   }
   $("#condition").textContent = msg("savedCity");
 }
 
-function sendFavoriteToBot(action, location) {
-  if (!window.Telegram?.WebApp?.sendData || !location) return;
+function syncFavoritesWithBot() {
+  if (!window.Telegram?.WebApp?.sendData) {
+    $("#condition").textContent = msg("syncUnavailable");
+    closeFavoritesMenu();
+    return;
+  }
   window.Telegram.WebApp.sendData(
     JSON.stringify({
-      action,
-      favorite_id: location.id,
-      location: {
+      action: "favorites:replace",
+      favorites: state.favorites.map((location) => ({
         name: location.name,
         latitude: Number(location.latitude),
         longitude: Number(location.longitude),
         country: location.country || "",
         timezone: location.timezone || "",
-      },
+      })),
     }),
   );
 }
@@ -1348,6 +1356,7 @@ function renderAll() {
 async function update(location = state.location) {
   try {
     state.location = location;
+    $("#locationName").textContent = location.country ? `${location.name}, ${location.country}` : location.name;
     $("#condition").textContent = msg("updating");
     state.data = await loadForecast(location);
     renderAll();
@@ -1418,6 +1427,7 @@ $("#refreshButton").addEventListener("click", () => update());
 $("#saveCityButton").addEventListener("click", saveCurrentCity);
 $("#favoritesMenuButton").addEventListener("click", openFavoritesMenu);
 $("#closeFavoritesButton").addEventListener("click", closeFavoritesMenu);
+$("#syncFavoritesButton").addEventListener("click", syncFavoritesWithBot);
 $("#favoritesSheet").addEventListener("click", (event) => {
   if (event.target.id === "favoritesSheet") closeFavoritesMenu();
 });

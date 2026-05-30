@@ -261,16 +261,27 @@ summary {
 .sheet-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 12px;
   margin-bottom: 12px;
 }
 
 .sheet-header h2 {
+  flex: 1;
   margin: 0;
   color: #ffffff;
   font-size: 18px;
   text-transform: none;
+}
+
+.sheet-sync {
+  min-height: 38px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  padding: 0 14px;
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.12);
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .sheet-close {
@@ -321,6 +332,7 @@ summary {
 .favorite-open {
   min-width: 0;
   text-align: left;
+  cursor: pointer;
 }
 
 .favorite-open strong,
@@ -345,6 +357,7 @@ summary {
   display: grid;
   place-items: center;
   background: rgba(255, 92, 92, 0.18);
+  cursor: pointer;
 }
 
 .favorite-delete svg {
