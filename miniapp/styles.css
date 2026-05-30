@@ -12,6 +12,7 @@
 
 * {
   box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
 }
 
 html,
@@ -64,6 +65,11 @@ body.webgl-ready #weatherCanvas {
   opacity: 0;
 }
 
+body.keyboard-open #weatherCanvas,
+body.keyboard-open #webglWeather {
+  opacity: 0 !important;
+}
+
 body.theme-clear {
   background:
     radial-gradient(circle at 20% 10%, rgba(255, 222, 122, 0.72), transparent 18rem),
@@ -102,6 +108,18 @@ body.theme-storm {
 button,
 input {
   font: inherit;
+}
+
+button,
+summary,
+input {
+  -webkit-touch-callout: none;
+}
+
+summary {
+  outline: none;
+  touch-action: manipulation;
+  user-select: none;
 }
 
 .app-shell {
@@ -518,6 +536,8 @@ h2 {
   position: relative;
   overflow: hidden;
   align-self: start;
+  background-clip: padding-box;
+  transform: translateZ(0);
 }
 
 .stats-grid details summary {
