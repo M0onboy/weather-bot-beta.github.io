@@ -67,7 +67,8 @@ body.webgl-ready #weatherCanvas {
 
 body.keyboard-open #weatherCanvas,
 body.keyboard-open #webglWeather {
-  opacity: 0 !important;
+  opacity: 0.18 !important;
+  filter: blur(8px);
 }
 
 body.theme-clear {

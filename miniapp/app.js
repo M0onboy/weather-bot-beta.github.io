@@ -1047,15 +1047,11 @@ $("#searchForm").addEventListener("submit", async (event) => {
 
 $("#cityInput").addEventListener("focus", () => {
   document.body.classList.add("keyboard-open");
-  stopWeatherAnimation();
 });
 
 $("#cityInput").addEventListener("blur", () => {
   document.body.classList.remove("keyboard-open");
-  window.setTimeout(() => {
-    resizeWeatherCanvas();
-    startWeatherAnimation();
-  }, 180);
+  window.setTimeout(resizeWeatherCanvas, 220);
 });
 
 document.addEventListener("pointerdown", (event) => {
