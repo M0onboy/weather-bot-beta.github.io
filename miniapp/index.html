@@ -63,12 +63,24 @@
       <section class="panel charts-panel">
         <h2 id="chartsTitle">Графики</h2>
         <div class="chart-block">
-          <div class="chart-title" id="tempChartTitle">Температура</div>
-          <svg id="tempChart" viewBox="0 0 320 120" preserveAspectRatio="none"></svg>
+          <div class="chart-header">
+            <div class="chart-title" id="tempChartTitle">Температура</div>
+            <div class="chart-meta" id="tempChartMeta"></div>
+          </div>
+          <div class="chart-wrap">
+            <svg id="tempChart" viewBox="0 0 320 130" preserveAspectRatio="none"></svg>
+            <div class="chart-tooltip" id="tempTooltip"></div>
+          </div>
         </div>
         <div class="chart-block">
-          <div class="chart-title" id="rainChartTitle">Осадки</div>
-          <svg id="rainChart" viewBox="0 0 320 120" preserveAspectRatio="none"></svg>
+          <div class="chart-header">
+            <div class="chart-title" id="rainChartTitle">Осадки</div>
+            <div class="chart-meta" id="rainChartMeta"></div>
+          </div>
+          <div class="chart-wrap">
+            <svg id="rainChart" viewBox="0 0 320 130" preserveAspectRatio="none"></svg>
+            <div class="chart-tooltip" id="rainTooltip"></div>
+          </div>
         </div>
       </section>
 

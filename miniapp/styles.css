@@ -474,19 +474,38 @@ h1 {
   margin-top: 16px;
 }
 
+.chart-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
 .chart-title {
   color: var(--muted);
   font-size: 13px;
   font-weight: 700;
-  margin-bottom: 8px;
+}
+
+.chart-meta {
+  color: rgba(255, 255, 255, 0.84);
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.chart-wrap {
+  position: relative;
 }
 
 .chart-block svg {
   width: 100%;
-  height: 120px;
+  height: 130px;
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.1);
   overflow: visible;
+  touch-action: none;
 }
 
 .chart-line {
@@ -503,6 +522,63 @@ h1 {
 
 .chart-bar {
   fill: rgba(127, 227, 255, 0.72);
+}
+
+.chart-grid {
+  stroke: rgba(255, 255, 255, 0.13);
+  stroke-width: 1;
+}
+
+.chart-label {
+  fill: rgba(255, 255, 255, 0.66);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.chart-point {
+  fill: #ffffff;
+  stroke: #ffd36f;
+  stroke-width: 2;
+}
+
+.chart-hit {
+  fill: transparent;
+  cursor: pointer;
+}
+
+.chart-tooltip {
+  position: absolute;
+  left: 0;
+  top: 0;
+  min-width: 88px;
+  padding: 7px 9px;
+  border-radius: 12px;
+  background: rgba(14, 22, 36, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.24);
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, -115%);
+  transition: opacity 140ms ease;
+  z-index: 4;
+}
+
+.chart-tooltip.visible {
+  opacity: 1;
+}
+
+.chart-tooltip strong,
+.chart-tooltip span {
+  display: block;
+}
+
+.chart-tooltip span {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12px;
 }
 
 h2 {
@@ -632,14 +708,33 @@ h2 {
   border-radius: 14px;
   padding: 8px 10px;
   background: rgba(255, 255, 255, 0.1);
+  display: grid;
+  grid-template-columns: 30px 1fr;
+  gap: 8px;
+  align-items: center;
 }
 
-.day-details span {
+.detail-icon {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  color: rgba(255, 255, 255, 0.86);
+}
+
+.detail-icon .ui-svg {
+  width: 22px;
+  height: 22px;
+}
+
+.detail-text span,
+.day-details > span {
   display: block;
   color: var(--muted);
   font-size: 12px;
 }
 
+.detail-text strong,
 .day-details strong {
   display: block;
   margin-top: 4px;

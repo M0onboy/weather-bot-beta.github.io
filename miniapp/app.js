@@ -312,8 +312,24 @@ function uiIcon(type) {
     rain: `<path d="M20 38h26a10 10 0 0 0 1-20 15 15 0 0 0-28 5 8 8 0 0 0 1 15Z" /><path d="M24 46l-4 8M36 46l-4 8M48 46l-4 8" />`,
     visibility: `<path d="M8 32s9-14 24-14 24 14 24 14-9 14-24 14S8 32 8 32Z" /><circle cx="32" cy="32" r="7" />`,
     sun: `<circle cx="32" cy="32" r="10" /><path d="M32 8v8M32 48v8M8 32h8M48 32h8M15 15l6 6M43 43l6 6M49 15l-6 6M21 43l-6 6" />`,
+    chance: `<path d="M20 38h26a10 10 0 0 0 1-20 15 15 0 0 0-28 5 8 8 0 0 0 1 15Z" /><path d="M22 52l20-20" /><circle cx="24" cy="34" r="3" /><circle cx="42" cy="50" r="3" />`,
+    gust: `<path d="M9 24h34a7 7 0 1 0-7-7" /><path d="M14 36h36a5 5 0 1 1-5 5" /><path d="M10 48h18" /><path d="M48 24l6 4-6 4" />`,
+    sunrise: `<path d="M12 44h40" /><path d="M22 44a10 10 0 0 1 20 0" /><path d="M32 12v18" /><path d="M24 20l8-8 8 8" />`,
+    sunset: `<path d="M12 44h40" /><path d="M22 44a10 10 0 0 1 20 0" /><path d="M32 12v18" /><path d="M24 22l8 8 8-8" />`,
   };
   return `<svg class="ui-svg" viewBox="0 0 64 64" aria-hidden="true">${icons[type] || icons.sun}</svg>`;
+}
+
+function detailItem(icon, label, value) {
+  return `
+    <div>
+      <span class="detail-icon">${uiIcon(icon)}</span>
+      <span class="detail-text">
+        <span>${label}</span>
+        <strong>${value}</strong>
+      </span>
+    </div>
+  `;
 }
 
 function themeForCode(code) {
@@ -781,31 +797,99 @@ function renderAlerts(data) {
 function renderCharts(data) {
   const temps = data.hourly.temperature_2m.slice(0, 24).map(Number);
   const rain = data.hourly.precipitation_probability.slice(0, 24).map(Number);
-  renderLineChart($("#tempChart"), temps);
-  renderBarChart($("#rainChart"), rain);
+  const times = data.hourly.time.slice(0, 24);
+  $("#tempChartMeta").textContent = `${Math.min(...temps)}°...${Math.max(...temps)}°`;
+  $("#rainChartMeta").textContent = `${Math.max(...rain)}% max`;
+  renderLineChart($("#tempChart"), $("#tempTooltip"), temps, times, "°");
+  renderBarChart($("#rainChart"), $("#rainTooltip"), rain, times, "%");
 }
 
-function renderLineChart(svg, values) {
+function chartX(index, length) {
+  return (index / Math.max(1, length - 1)) * 280 + 24;
+}
+
+function chartTimeLabel(iso) {
+  return new Date(iso).toLocaleTimeString(locale(), { hour: "2-digit", minute: "2-digit" });
+}
+
+function renderGrid(svg, min, max) {
+  const mid = Math.round((min + max) / 2);
+  return `
+    <line class="chart-grid" x1="24" y1="18" x2="304" y2="18"></line>
+    <line class="chart-grid" x1="24" y1="62" x2="304" y2="62"></line>
+    <line class="chart-grid" x1="24" y1="106" x2="304" y2="106"></line>
+    <text class="chart-label" x="6" y="21">${max}</text>
+    <text class="chart-label" x="6" y="65">${mid}</text>
+    <text class="chart-label" x="6" y="109">${min}</text>
+  `;
+}
+
+function placeTooltip(svg, tooltip, x, y, value, time, unit) {
+  const rect = svg.getBoundingClientRect();
+  const px = (x / 320) * rect.width;
+  const py = (y / 130) * rect.height;
+  tooltip.innerHTML = `<strong>${value}${unit}</strong><span>${chartTimeLabel(time)}</span>`;
+  tooltip.style.left = `${px}px`;
+  tooltip.style.top = `${py}px`;
+  tooltip.classList.add("visible");
+}
+
+function renderLineChart(svg, tooltip, values, times, unit) {
   const min = Math.min(...values);
   const max = Math.max(...values);
   const points = values.map((value, index) => {
-    const x = (index / (values.length - 1)) * 300 + 10;
-    const y = 100 - ((value - min) / Math.max(1, max - min)) * 80;
+    const x = chartX(index, values.length);
+    const y = 106 - ((value - min) / Math.max(1, max - min)) * 88;
     return [x, y];
   });
   const path = points.map(([x, y], index) => `${index ? "L" : "M"}${x.toFixed(1)} ${y.toFixed(1)}`).join(" ");
-  const area = `${path} L310 110 L10 110 Z`;
-  svg.innerHTML = `<path class="chart-area" d="${area}"></path><path class="chart-line" d="${path}"></path>`;
+  const area = `${path} L304 112 L24 112 Z`;
+  svg.innerHTML = `
+    ${renderGrid(svg, min, max)}
+    <path class="chart-area" d="${area}"></path>
+    <path class="chart-line" d="${path}"></path>
+    ${points.map(([x, y], index) => `<circle class="chart-point" cx="${x}" cy="${y}" r="3"></circle><rect class="chart-hit" x="${x - 8}" y="8" width="16" height="112" data-index="${index}"></rect>`).join("")}
+    <text class="chart-label" x="24" y="124">${chartTimeLabel(times[0])}</text>
+    <text class="chart-label" x="266" y="124">${chartTimeLabel(times[times.length - 1])}</text>
+  `;
+  attachChartTooltip(svg, tooltip, points, values, times, unit);
 }
 
-function renderBarChart(svg, values) {
-  svg.innerHTML = values.map((value, index) => {
-    const width = 300 / values.length;
-    const height = Math.max(4, (value / 100) * 90);
-    const x = 10 + index * width;
-    const y = 110 - height;
-    return `<rect class="chart-bar" x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${Math.max(4, width - 3).toFixed(1)}" height="${height.toFixed(1)}" rx="3"></rect>`;
-  }).join("");
+function renderBarChart(svg, tooltip, values, times, unit) {
+  const max = Math.max(10, ...values);
+  const width = 280 / values.length;
+  const points = values.map((value, index) => {
+    const height = Math.max(4, (value / 100) * 88);
+    const x = 24 + index * width;
+    const y = 106 - height;
+    return [x + width / 2, y, height];
+  });
+  svg.innerHTML = `
+    ${renderGrid(svg, 0, max)}
+    ${values.map((value, index) => {
+      const height = Math.max(4, (value / 100) * 88);
+      const x = 24 + index * width;
+      const y = 106 - height;
+      return `<rect class="chart-bar" x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${Math.max(4, width - 3).toFixed(1)}" height="${height.toFixed(1)}" rx="3"></rect><rect class="chart-hit" x="${x.toFixed(1)}" y="8" width="${width.toFixed(1)}" height="112" data-index="${index}"></rect>`;
+    }).join("")}
+    <text class="chart-label" x="24" y="124">${chartTimeLabel(times[0])}</text>
+    <text class="chart-label" x="266" y="124">${chartTimeLabel(times[times.length - 1])}</text>
+  `;
+  attachChartTooltip(svg, tooltip, points.map(([x, y]) => [x, y]), values, times, unit);
+}
+
+function attachChartTooltip(svg, tooltip, points, values, times, unit) {
+  const show = (index) => {
+    const [x, y] = points[index];
+    placeTooltip(svg, tooltip, x, y, values[index], times[index], unit);
+  };
+  svg.querySelectorAll(".chart-hit").forEach((hit) => {
+    const index = Number(hit.dataset.index);
+    hit.addEventListener("pointerenter", () => show(index));
+    hit.addEventListener("pointermove", () => show(index));
+    hit.addEventListener("pointerdown", () => show(index));
+  });
+  svg.addEventListener("pointerleave", () => tooltip.classList.remove("visible"));
 }
 
 function renderHourly(data) {
@@ -860,15 +944,15 @@ function renderDaily(data) {
       </summary>
       <div class="day-details">
         <div class="day-condition">${description}</div>
-        <div><span>${msg("tempRange")}</span><strong>${round(low)}°...${round(high)}°</strong></div>
-        <div><span>${msg("feels")}</span><strong>${round(data.daily.apparent_temperature_min[index])}°...${round(data.daily.apparent_temperature_max[index])}°</strong></div>
-        <div><span>${msg("precipitation")}</span><strong>${data.daily.precipitation_sum[index]} mm</strong></div>
-        <div><span>${msg("chance")}</span><strong>${data.daily.precipitation_probability_max[index]}%</strong></div>
-        <div><span>${msg("maxWind")}</span><strong>${round(data.daily.wind_speed_10m_max[index])} km/h</strong></div>
-        <div><span>${msg("gustsShort")}</span><strong>${round(data.daily.wind_gusts_10m_max[index])} km/h</strong></div>
-        <div><span>${msg("uv")}</span><strong>${data.daily.uv_index_max[index]}</strong></div>
-        <div><span>${msg("sunrise")}</span><strong>${data.daily.sunrise[index].slice(-5)}</strong></div>
-        <div><span>${msg("sunset")}</span><strong>${data.daily.sunset[index].slice(-5)}</strong></div>
+        ${detailItem("thermo", msg("tempRange"), `${round(low)}°...${round(high)}°`)}
+        ${detailItem("thermo", msg("feels"), `${round(data.daily.apparent_temperature_min[index])}°...${round(data.daily.apparent_temperature_max[index])}°`)}
+        ${detailItem("rain", msg("precipitation"), `${data.daily.precipitation_sum[index]} mm`)}
+        ${detailItem("chance", msg("chance"), `${data.daily.precipitation_probability_max[index]}%`)}
+        ${detailItem("wind", msg("maxWind"), `${round(data.daily.wind_speed_10m_max[index])} km/h`)}
+        ${detailItem("gust", msg("gustsShort"), `${round(data.daily.wind_gusts_10m_max[index])} km/h`)}
+        ${detailItem("uv", msg("uv"), `${data.daily.uv_index_max[index]}`)}
+        ${detailItem("sunrise", msg("sunrise"), `${data.daily.sunrise[index].slice(-5)}`)}
+        ${detailItem("sunset", msg("sunset"), `${data.daily.sunset[index].slice(-5)}`)}
       </div>
     `;
     holder.append(card);
