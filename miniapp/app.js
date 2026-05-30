@@ -727,12 +727,21 @@ function useBrowserLocation() {
 
 $("#searchForm").addEventListener("submit", async (event) => {
   event.preventDefault();
-  const city = $("#cityInput").value.trim();
+  const input = $("#cityInput");
+  const city = input.value.trim();
   if (!city) return;
+  input.blur();
   try {
     await update(await geocode(city));
   } catch (error) {
     $("#condition").textContent = error.message || msg("cityNotFound");
+  }
+});
+
+document.addEventListener("pointerdown", (event) => {
+  const input = $("#cityInput");
+  if (document.activeElement === input && !event.target.closest(".search")) {
+    input.blur();
   }
 });
 
