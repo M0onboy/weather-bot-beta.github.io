@@ -38,6 +38,7 @@
           <button type="button" data-lang="kk">KZ</button>
           <button type="button" data-lang="en">EN</button>
         </div>
+        <div class="favorites-row" id="favoritesRow"></div>
 
         <div class="current">
           <div class="weather-orb" aria-hidden="true">
@@ -48,12 +49,27 @@
           <p class="condition" id="condition">Получаем прогноз</p>
           <p class="range" id="range">Макс. --° Мин. --°</p>
           <div class="hero-metrics" id="heroMetrics"></div>
+          <button class="save-city" id="saveCityButton" type="button">⭐</button>
         </div>
       </section>
+
+      <section class="alert-card" id="alertCard" hidden></section>
 
       <section class="panel hourly-panel">
         <h2 id="hourlyTitle">По часам</h2>
         <div class="hourly" id="hourly"></div>
+      </section>
+
+      <section class="panel charts-panel">
+        <h2 id="chartsTitle">Графики</h2>
+        <div class="chart-block">
+          <div class="chart-title" id="tempChartTitle">Температура</div>
+          <svg id="tempChart" viewBox="0 0 320 120" preserveAspectRatio="none"></svg>
+        </div>
+        <div class="chart-block">
+          <div class="chart-title" id="rainChartTitle">Осадки</div>
+          <svg id="rainChart" viewBox="0 0 320 120" preserveAspectRatio="none"></svg>
+        </div>
       </section>
 
       <section class="panel">

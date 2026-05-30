@@ -9,6 +9,7 @@ const messages = {
     updating: "Обновляем прогноз",
     hourly: "По часам",
     daily: "Прогноз на 7 дней",
+    charts: "Графики",
     max: "Макс.",
     min: "Мин.",
     now: "Сейчас",
@@ -62,6 +63,10 @@ const messages = {
     maxToday: "Макс.",
     avgToday: "Среднее",
     nextPeak: "Пик в ближайшие часы",
+    saveCity: "Сохранить город",
+    savedCity: "Город сохранён",
+    weatherAlert: "Погодное предупреждение",
+    noAlerts: "Серьёзных рисков не видно",
   },
   kk: {
     city: "Қала",
@@ -70,6 +75,7 @@ const messages = {
     updating: "Болжам жаңартылуда",
     hourly: "Сағат бойынша",
     daily: "7 күндік болжам",
+    charts: "Графиктер",
     max: "Макс.",
     min: "Мин.",
     now: "Қазір",
@@ -123,6 +129,10 @@ const messages = {
     maxToday: "Макс.",
     avgToday: "Орташа",
     nextPeak: "Жақын сағаттардағы максимум",
+    saveCity: "Қаланы сақтау",
+    savedCity: "Қала сақталды",
+    weatherAlert: "Ауа райы ескертуі",
+    noAlerts: "Маңызды қауіп байқалмайды",
   },
   en: {
     city: "City",
@@ -131,6 +141,7 @@ const messages = {
     updating: "Updating forecast",
     hourly: "Hourly",
     daily: "7-day forecast",
+    charts: "Charts",
     max: "Max",
     min: "Min",
     now: "Now",
@@ -184,6 +195,10 @@ const messages = {
     maxToday: "Max",
     avgToday: "Average",
     nextPeak: "Next-hours peak",
+    saveCity: "Save city",
+    savedCity: "City saved",
+    weatherAlert: "Weather alert",
+    noAlerts: "No major risks visible",
   },
 };
 
@@ -222,6 +237,7 @@ const state = {
   lang: ["ru", "kk", "en"].includes(initialLang) ? initialLang : "ru",
   location: { name: "Almaty", latitude: 43.25, longitude: 76.95, country: "Kazakhstan" },
   data: null,
+  favorites: JSON.parse(localStorage.getItem("weatherFavorites") || "[]"),
 };
 
 const $ = (selector) => document.querySelector(selector);
@@ -612,9 +628,14 @@ function applyStaticText() {
   $("#condition").textContent = state.data ? $("#condition").textContent : msg("getting");
   $("#hourlyTitle").textContent = msg("hourly");
   $("#dailyTitle").textContent = msg("daily");
+  $("#chartsTitle").textContent = msg("charts");
+  $("#tempChartTitle").textContent = msg("temperature");
+  $("#rainChartTitle").textContent = msg("precipitation");
+  $("#saveCityButton").title = msg("saveCity");
   document.querySelectorAll("[data-lang]").forEach((button) => {
     button.classList.toggle("active", button.dataset.lang === state.lang);
   });
+  renderFavorites();
 }
 
 async function geocode(city) {
@@ -708,6 +729,83 @@ function renderCurrent(location, data) {
       `,
     )
     .join("");
+}
+
+function renderFavorites() {
+  const holder = $("#favoritesRow");
+  holder.textContent = "";
+  state.favorites.slice(0, 8).forEach((favorite) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "favorite-chip";
+    button.textContent = favorite.name;
+    button.addEventListener("click", () => update(favorite));
+    holder.append(button);
+  });
+}
+
+function saveCurrentCity() {
+  const location = state.location;
+  const exists = state.favorites.some((item) => item.name === location.name && Number(item.latitude).toFixed(2) === Number(location.latitude).toFixed(2));
+  if (!exists) {
+    state.favorites.unshift(location);
+    state.favorites = state.favorites.slice(0, 8);
+    localStorage.setItem("weatherFavorites", JSON.stringify(state.favorites));
+    renderFavorites();
+  }
+  $("#condition").textContent = msg("savedCity");
+}
+
+function alertMessages(data) {
+  const current = data.current;
+  const daily = data.daily;
+  const alerts = [];
+  if (daily.precipitation_probability_max[0] >= 70) alerts.push(`${msg("precipitation")}: ${daily.precipitation_probability_max[0]}%`);
+  if (daily.wind_gusts_10m_max[0] >= 45) alerts.push(`${msg("gusts")}: ${round(daily.wind_gusts_10m_max[0])} km/h`);
+  if (daily.uv_index_max[0] >= 6) alerts.push(`${msg("uv")}: ${daily.uv_index_max[0]}`);
+  if (current.weather_code === 45 || current.weather_code === 48) alerts.push(describe(current.weather_code)[0]);
+  return alerts;
+}
+
+function renderAlerts(data) {
+  const card = $("#alertCard");
+  const alerts = alertMessages(data);
+  if (!alerts.length) {
+    card.hidden = true;
+    return;
+  }
+  card.hidden = false;
+  card.innerHTML = `<h2>${msg("weatherAlert")}</h2><p>${alerts.join(" · ")}</p>`;
+}
+
+function renderCharts(data) {
+  const temps = data.hourly.temperature_2m.slice(0, 24).map(Number);
+  const rain = data.hourly.precipitation_probability.slice(0, 24).map(Number);
+  renderLineChart($("#tempChart"), temps);
+  renderBarChart($("#rainChart"), rain);
+}
+
+function renderLineChart(svg, values) {
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const points = values.map((value, index) => {
+    const x = (index / (values.length - 1)) * 300 + 10;
+    const y = 100 - ((value - min) / Math.max(1, max - min)) * 80;
+    return [x, y];
+  });
+  const path = points.map(([x, y], index) => `${index ? "L" : "M"}${x.toFixed(1)} ${y.toFixed(1)}`).join(" ");
+  const area = `${path} L310 110 L10 110 Z`;
+  svg.innerHTML = `<path class="chart-area" d="${area}"></path><path class="chart-line" d="${path}"></path>`;
+}
+
+function renderBarChart(svg, values) {
+  svg.innerHTML = values.map((value, index) => {
+    const width = 300 / values.length;
+    const height = Math.max(4, (value / 100) * 90);
+    const x = 10 + index * width;
+    const y = 110 - height;
+    return `<rect class="chart-bar" x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${Math.max(4, width - 3).toFixed(1)}" height="${height.toFixed(1)}" rx="3"></rect>`;
+  }).join("");
 }
 
 function renderHourly(data) {
@@ -997,6 +1095,8 @@ function renderAll() {
   if (!state.data) return;
   renderCurrent(state.location, state.data);
   renderHourly(state.data);
+  renderAlerts(state.data);
+  renderCharts(state.data);
   renderDaily(state.data);
   renderStats(state.data);
 }
@@ -1071,6 +1171,7 @@ document.querySelectorAll("[data-lang]").forEach((button) => {
 
 $("#geoButton").addEventListener("click", useBrowserLocation);
 $("#refreshButton").addEventListener("click", () => update());
+$("#saveCityButton").addEventListener("click", saveCurrentCity);
 window.addEventListener("resize", resizeWeatherCanvas);
 motionQuery.addEventListener?.("change", () => {
   if (motionQuery.matches) {
