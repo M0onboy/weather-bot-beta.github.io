@@ -167,6 +167,21 @@ const state = {
 const $ = (selector) => document.querySelector(selector);
 const round = (value) => Math.round(Number(value));
 const msg = (key) => messages[state.lang][key];
+const motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+const weatherCanvas = {
+  canvas: $("#weatherCanvas"),
+  ctx: null,
+  mode: "clear",
+  width: 0,
+  height: 0,
+  dpr: 1,
+  particles: [],
+  clouds: [],
+  flashes: [],
+  frame: null,
+  last: 0,
+};
 
 function describe(code) {
   return codes[code]?.[state.lang] || codes[code]?.ru || ["Unknown", "🌡"];
@@ -211,6 +226,20 @@ function weatherIcon(type, compact = false) {
   return `<svg class="${cls}" viewBox="0 0 64 64" aria-hidden="true">${body}</svg>`;
 }
 
+function uiIcon(type) {
+  const icons = {
+    thermo: `<path d="M22 36.5V13a6 6 0 0 1 12 0v23.5a11 11 0 1 1-12 0Z" /><path d="M28 17v25" /><path d="M24 46a4 4 0 1 0 8 0 4 4 0 0 0-8 0Z" />`,
+    humidity: `<path d="M32 8S18 25 18 38a14 14 0 0 0 28 0C46 25 32 8 32 8Z" /><path d="M25 39a7 7 0 0 0 11 6" />`,
+    wind: `<path d="M10 24h30a7 7 0 1 0-7-7" /><path d="M10 34h38a6 6 0 1 1-6 6" /><path d="M10 44h18" />`,
+    pressure: `<circle cx="32" cy="34" r="18" /><path d="M32 34l10-10" /><path d="M20 46h24" /><path d="M18 34h4M42 34h4M32 20v4" />`,
+    uv: `<circle cx="32" cy="32" r="10" /><path d="M32 8v8M32 48v8M8 32h8M48 32h8M15 15l6 6M43 43l6 6M49 15l-6 6M21 43l-6 6" />`,
+    rain: `<path d="M20 38h26a10 10 0 0 0 1-20 15 15 0 0 0-28 5 8 8 0 0 0 1 15Z" /><path d="M24 46l-4 8M36 46l-4 8M48 46l-4 8" />`,
+    visibility: `<path d="M8 32s9-14 24-14 24 14 24 14-9 14-24 14S8 32 8 32Z" /><circle cx="32" cy="32" r="7" />`,
+    sun: `<circle cx="32" cy="32" r="10" /><path d="M32 8v8M32 48v8M8 32h8M48 32h8M15 15l6 6M43 43l6 6M49 15l-6 6M21 43l-6 6" />`,
+  };
+  return `<svg class="ui-svg" viewBox="0 0 64 64" aria-hidden="true">${icons[type] || icons.sun}</svg>`;
+}
+
 function themeForCode(code) {
   if ([0, 1].includes(code)) return "theme-clear";
   if ([2, 3, 45, 48].includes(code)) return "theme-cloudy";
@@ -222,7 +251,222 @@ function themeForCode(code) {
 
 function applyTheme(code) {
   document.body.classList.remove("theme-clear", "theme-cloudy", "theme-rain", "theme-snow", "theme-storm");
-  document.body.classList.add(themeForCode(code));
+  const theme = themeForCode(code);
+  document.body.classList.add(theme);
+  setWeatherAnimation(theme.replace("theme-", ""));
+}
+
+function resizeWeatherCanvas() {
+  const canvas = weatherCanvas.canvas;
+  if (!canvas) return;
+  weatherCanvas.dpr = Math.min(window.devicePixelRatio || 1, 2);
+  weatherCanvas.width = window.innerWidth;
+  weatherCanvas.height = window.innerHeight;
+  canvas.width = Math.floor(weatherCanvas.width * weatherCanvas.dpr);
+  canvas.height = Math.floor(weatherCanvas.height * weatherCanvas.dpr);
+  canvas.style.width = `${weatherCanvas.width}px`;
+  canvas.style.height = `${weatherCanvas.height}px`;
+  weatherCanvas.ctx = canvas.getContext("2d");
+  weatherCanvas.ctx.setTransform(weatherCanvas.dpr, 0, 0, weatherCanvas.dpr, 0, 0);
+  seedWeatherAnimation();
+}
+
+function random(min, max) {
+  return min + Math.random() * (max - min);
+}
+
+function seedWeatherAnimation() {
+  const { mode, width, height } = weatherCanvas;
+  const isSmall = width < 460;
+  const count = {
+    clear: isSmall ? 18 : 28,
+    cloudy: isSmall ? 7 : 10,
+    rain: isSmall ? 70 : 110,
+    snow: isSmall ? 42 : 70,
+    storm: isSmall ? 55 : 85,
+  }[mode] || 20;
+
+  weatherCanvas.particles = Array.from({ length: count }, () => createParticle(mode, width, height));
+  weatherCanvas.clouds = Array.from({ length: mode === "cloudy" ? count : 0 }, () => ({
+    x: random(-width * 0.2, width),
+    y: random(40, height * 0.55),
+    r: random(52, 130),
+    speed: random(3, 12),
+    alpha: random(0.05, 0.13),
+  }));
+}
+
+function createParticle(mode, width, height) {
+  if (mode === "rain" || mode === "storm") {
+    return {
+      x: random(-width * 0.2, width * 1.2),
+      y: random(-height, height),
+      length: random(12, mode === "storm" ? 34 : 28),
+      speed: random(mode === "storm" ? 520 : 430, mode === "storm" ? 760 : 620),
+      drift: random(-150, -80),
+      alpha: random(0.22, 0.56),
+      splash: 0,
+    };
+  }
+  if (mode === "snow") {
+    return {
+      x: random(0, width),
+      y: random(-height, height),
+      size: random(1.4, 4.4),
+      speed: random(24, 70),
+      drift: random(-18, 18),
+      spin: random(0, Math.PI * 2),
+      alpha: random(0.35, 0.86),
+    };
+  }
+  return {
+    x: random(0, width),
+    y: random(0, height),
+    size: random(1.2, 3.6),
+    speed: random(4, 14),
+    alpha: random(0.08, 0.24),
+    phase: random(0, Math.PI * 2),
+  };
+}
+
+function setWeatherAnimation(mode) {
+  const normalized = mode === "storm" ? "storm" : mode === "rain" ? "rain" : mode === "snow" ? "snow" : mode === "cloudy" ? "cloudy" : "clear";
+  window.dispatchEvent(new CustomEvent("weather-mode-change", { detail: { mode: normalized } }));
+  window.weather3D?.setMode?.(normalized);
+  if (weatherCanvas.mode === normalized && weatherCanvas.frame) return;
+  weatherCanvas.mode = normalized;
+  seedWeatherAnimation();
+  startWeatherAnimation();
+}
+
+function startWeatherAnimation() {
+  if (!weatherCanvas.canvas || !weatherCanvas.ctx || motionQuery.matches) {
+    stopWeatherAnimation();
+    return;
+  }
+  if (weatherCanvas.frame) return;
+  weatherCanvas.last = performance.now();
+  weatherCanvas.frame = requestAnimationFrame(drawWeatherFrame);
+}
+
+function stopWeatherAnimation() {
+  if (weatherCanvas.frame) cancelAnimationFrame(weatherCanvas.frame);
+  weatherCanvas.frame = null;
+  if (weatherCanvas.ctx) weatherCanvas.ctx.clearRect(0, 0, weatherCanvas.width, weatherCanvas.height);
+}
+
+function drawWeatherFrame(now) {
+  const dt = Math.min(0.033, (now - weatherCanvas.last) / 1000 || 0.016);
+  weatherCanvas.last = now;
+  const ctx = weatherCanvas.ctx;
+  const { width, height, mode } = weatherCanvas;
+  ctx.clearRect(0, 0, width, height);
+
+  if (mode === "cloudy") drawClouds(ctx, dt);
+  if (mode === "rain" || mode === "storm") drawRain(ctx, dt, mode);
+  if (mode === "snow") drawSnow(ctx, dt);
+  if (mode === "clear") drawClear(ctx, dt);
+  if (mode === "storm") drawStorm(ctx, dt);
+
+  weatherCanvas.frame = requestAnimationFrame(drawWeatherFrame);
+}
+
+function drawClouds(ctx, dt) {
+  const { width, height } = weatherCanvas;
+  weatherCanvas.clouds.forEach((cloud) => {
+    cloud.x += cloud.speed * dt;
+    if (cloud.x - cloud.r > width) {
+      cloud.x = -cloud.r * 2;
+      cloud.y = random(40, height * 0.55);
+    }
+    const gradient = ctx.createRadialGradient(cloud.x, cloud.y, 0, cloud.x, cloud.y, cloud.r);
+    gradient.addColorStop(0, `rgba(255,255,255,${cloud.alpha})`);
+    gradient.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.arc(cloud.x, cloud.y, cloud.r, 0, Math.PI * 2);
+    ctx.fill();
+  });
+}
+
+function drawRain(ctx, dt, mode) {
+  const { width, height } = weatherCanvas;
+  ctx.lineCap = "round";
+  weatherCanvas.particles.forEach((drop) => {
+    drop.x += drop.drift * dt;
+    drop.y += drop.speed * dt;
+    const impactY = height * 0.56 + Math.sin(drop.x * 0.014) * 26;
+    if (drop.y > impactY && drop.y < impactY + drop.speed * dt + 16) {
+      drop.splash = 1;
+    }
+    if (drop.y > height + 60 || drop.x < -80) {
+      Object.assign(drop, createParticle(mode, width, height), { y: random(-120, -20) });
+    }
+    ctx.strokeStyle = `rgba(205,239,255,${drop.alpha})`;
+    ctx.lineWidth = mode === "storm" ? 1.5 : 1.2;
+    ctx.beginPath();
+    ctx.moveTo(drop.x, drop.y);
+    ctx.lineTo(drop.x + drop.drift * 0.035, drop.y + drop.length);
+    ctx.stroke();
+
+    if (drop.splash > 0) {
+      ctx.strokeStyle = `rgba(220,246,255,${0.25 * drop.splash})`;
+      ctx.beginPath();
+      ctx.moveTo(drop.x - 8 * drop.splash, impactY);
+      ctx.lineTo(drop.x + 8 * drop.splash, impactY);
+      ctx.stroke();
+      drop.splash -= dt * 4;
+    }
+  });
+}
+
+function drawSnow(ctx, dt) {
+  const { width, height } = weatherCanvas;
+  weatherCanvas.particles.forEach((flake) => {
+    flake.spin += dt;
+    flake.x += (flake.drift + Math.sin(flake.spin) * 10) * dt;
+    flake.y += flake.speed * dt;
+    if (flake.y > height + 20) {
+      Object.assign(flake, createParticle("snow", width, height), { y: -20 });
+    }
+    if (flake.x < -20) flake.x = width + 20;
+    if (flake.x > width + 20) flake.x = -20;
+    ctx.fillStyle = `rgba(255,255,255,${flake.alpha})`;
+    ctx.beginPath();
+    ctx.arc(flake.x, flake.y, flake.size, 0, Math.PI * 2);
+    ctx.fill();
+  });
+}
+
+function drawClear(ctx, dt) {
+  const { width, height } = weatherCanvas;
+  weatherCanvas.particles.forEach((spark) => {
+    spark.phase += dt * spark.speed;
+    const alpha = spark.alpha * (0.55 + Math.sin(spark.phase) * 0.45);
+    ctx.fillStyle = `rgba(255,245,198,${alpha})`;
+    ctx.beginPath();
+    ctx.arc(spark.x, spark.y, spark.size, 0, Math.PI * 2);
+    ctx.fill();
+    spark.y -= dt * spark.speed;
+    if (spark.y < -10) {
+      spark.y = height + 10;
+      spark.x = random(0, width);
+    }
+  });
+}
+
+function drawStorm(ctx, dt) {
+  const { width, height } = weatherCanvas;
+  if (Math.random() < 0.008) {
+    weatherCanvas.flashes.push({ alpha: random(0.12, 0.28), life: random(0.08, 0.18) });
+  }
+  weatherCanvas.flashes = weatherCanvas.flashes.filter((flash) => {
+    ctx.fillStyle = `rgba(255,255,255,${flash.alpha})`;
+    ctx.fillRect(0, 0, width, height);
+    flash.life -= dt;
+    flash.alpha *= 0.78;
+    return flash.life > 0;
+  });
 }
 
 function locale() {
@@ -368,9 +612,23 @@ function renderDaily(data) {
     const type = iconType(data.daily.weather_code[index]);
     const [description] = describe(data.daily.weather_code[index]);
     const width = Math.max(18, ((high - low) / Math.max(1, max - min)) * 100);
+    if (index === 0) {
+      const todayRow = document.createElement("article");
+      todayRow.className = "day-card day-card-static";
+      todayRow.innerHTML = `
+        <div class="day-row">
+          <strong>${msg("today")}</strong>
+          <span class="day-icon">${weatherIcon(type, true)}</span>
+          <span class="bar-wrap"><span class="bar" style="width:${width}%"></span></span>
+          <span class="daily-meta">${round(low)}° / ${round(high)}°</span>
+        </div>
+      `;
+      holder.append(todayRow);
+      return;
+    }
+
     const card = document.createElement("details");
     card.className = "day-card";
-    if (index === 0) card.open = true;
     card.innerHTML = `
       <summary class="day-row">
         <strong>${index === 0 ? msg("today") : dayLabel(time)}</strong>
@@ -402,21 +660,21 @@ function renderStats(data) {
   const first24 = (key) => hourly[key].slice(0, 24);
   const avg = (values) => Math.round(values.reduce((sum, value) => sum + Number(value), 0) / values.length);
   const stats = [
-    ["thermo", "🌡", msg("feels"), `${round(current.apparent_temperature)}°`, msg("feelsNote")],
-    ["humidity", "💧", msg("humidity"), `${current.relative_humidity_2m}%`, `${msg("humidityAvg")}: ${avg(first24("relative_humidity_2m"))}%`],
-    ["wind", "💨", msg("wind"), `${round(current.wind_speed_10m)} km/h`, `${msg("gusts")} ${round(current.wind_gusts_10m)} km/h`],
-    ["pressure", "🧭", msg("pressure"), `${round(current.pressure_msl)} hPa`, `${msg("pressureAvg")}: ${avg(first24("pressure_msl"))} hPa`],
-    ["uv", "☀️", msg("uv"), `${daily.uv_index_max[0]}`, msg("uvNote")],
-    ["rain", "🌧", msg("precipitation"), `${daily.precipitation_sum[0]} mm`, `${msg("chance")} ${daily.precipitation_probability_max[0]}%`],
-    ["visibility", "👁", msg("visibility"), `${(Math.min(...first24("visibility")) / 1000).toFixed(1)} km`, msg("visibilityNote")],
-    ["sun", "🌇", msg("sun"), daily.sunset[0].slice(-5), `${msg("sunrise")} ${daily.sunrise[0].slice(-5)}`],
+    ["thermo", msg("feels"), `${round(current.apparent_temperature)}°`, msg("feelsNote")],
+    ["humidity", msg("humidity"), `${current.relative_humidity_2m}%`, `${msg("humidityAvg")}: ${avg(first24("relative_humidity_2m"))}%`],
+    ["wind", msg("wind"), `${round(current.wind_speed_10m)} km/h`, `${msg("gusts")} ${round(current.wind_gusts_10m)} km/h`],
+    ["pressure", msg("pressure"), `${round(current.pressure_msl)} hPa`, `${msg("pressureAvg")}: ${avg(first24("pressure_msl"))} hPa`],
+    ["uv", msg("uv"), `${daily.uv_index_max[0]}`, msg("uvNote")],
+    ["rain", msg("precipitation"), `${daily.precipitation_sum[0]} mm`, `${msg("chance")} ${daily.precipitation_probability_max[0]}%`],
+    ["visibility", msg("visibility"), `${(Math.min(...first24("visibility")) / 1000).toFixed(1)} km`, msg("visibilityNote")],
+    ["sun", msg("sun"), daily.sunset[0].slice(-5), `${msg("sunrise")} ${daily.sunrise[0].slice(-5)}`],
   ];
   $("#stats").innerHTML = stats
     .map(
-      ([tone, icon, label, value, note]) => `
+      ([tone, label, value, note]) => `
         <article class="stat-${tone}">
           <div class="stat-head">
-            <span class="stat-icon">${icon}</span>
+            <span class="stat-icon">${uiIcon(tone)}</span>
             <span class="stat-label">${label}</span>
           </div>
           <div class="stat-value">${value}</div>
@@ -488,9 +746,20 @@ document.querySelectorAll("[data-lang]").forEach((button) => {
 
 $("#geoButton").addEventListener("click", useBrowserLocation);
 $("#refreshButton").addEventListener("click", () => update());
+window.addEventListener("resize", resizeWeatherCanvas);
+motionQuery.addEventListener?.("change", () => {
+  if (motionQuery.matches) {
+    stopWeatherAnimation();
+  } else {
+    resizeWeatherCanvas();
+    startWeatherAnimation();
+  }
+});
 
 window.Telegram?.WebApp?.ready();
 window.Telegram?.WebApp?.expand();
 
+resizeWeatherCanvas();
+setWeatherAnimation("clear");
 applyStaticText();
 update();
