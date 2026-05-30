@@ -2,7 +2,7 @@
   color-scheme: dark;
   --text: #ffffff;
   --muted: rgba(255, 255, 255, 0.72);
-  --panel: rgba(16, 24, 38, 0.46);
+  --panel: rgba(18, 28, 48, 0.64);
   --panel-strong: rgba(255, 255, 255, 0.18);
   --panel-border: rgba(255, 255, 255, 0.18);
   --shadow: rgba(0, 0, 0, 0.24);
@@ -361,7 +361,10 @@ h1 {
 .stats-grid article,
 .stats-grid details {
   border: 1px solid var(--panel-border);
-  background: var(--panel);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.05)),
+    var(--panel);
+  -webkit-backdrop-filter: blur(28px) saturate(140%);
   backdrop-filter: blur(28px);
   box-shadow: 0 18px 44px rgba(0, 0, 0, 0.18);
 }
