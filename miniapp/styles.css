@@ -106,6 +106,50 @@ body.theme-storm {
     linear-gradient(160deg, #283e66 0%, #242b4e 45%, #332958 74%, #16192f 100%);
 }
 
+body.theme-night {
+  --panel: rgba(8, 13, 28, 0.7);
+  --panel-strong: rgba(255, 255, 255, 0.13);
+  --panel-border: rgba(205, 221, 255, 0.15);
+  --shadow: rgba(0, 0, 0, 0.36);
+  --accent: #d9e8ff;
+  --accent-2: #8fd7ff;
+}
+
+body.theme-night.theme-clear {
+  background:
+    radial-gradient(circle at 24% 12%, rgba(233, 241, 255, 0.35), transparent 10rem),
+    radial-gradient(circle at 80% 22%, rgba(97, 143, 255, 0.22), transparent 18rem),
+    linear-gradient(160deg, #111f45 0%, #151a38 44%, #211a40 72%, #090d1f 100%);
+}
+
+body.theme-night.theme-cloudy {
+  background:
+    radial-gradient(circle at 18% 10%, rgba(205, 221, 255, 0.2), transparent 16rem),
+    radial-gradient(circle at 78% 24%, rgba(113, 132, 178, 0.26), transparent 18rem),
+    linear-gradient(160deg, #182844 0%, #20263e 45%, #24223f 74%, #0d1022 100%);
+}
+
+body.theme-night.theme-rain {
+  background:
+    radial-gradient(circle at 20% 10%, rgba(104, 189, 255, 0.16), transparent 16rem),
+    radial-gradient(circle at 84% 24%, rgba(111, 109, 204, 0.2), transparent 18rem),
+    linear-gradient(160deg, #15283f 0%, #192036 44%, #211d39 74%, #090c1c 100%);
+}
+
+body.theme-night.theme-snow {
+  background:
+    radial-gradient(circle at 20% 10%, rgba(235, 249, 255, 0.28), transparent 15rem),
+    radial-gradient(circle at 82% 24%, rgba(134, 190, 255, 0.2), transparent 18rem),
+    linear-gradient(160deg, #203556 0%, #232b49 45%, #28233f 74%, #101324 100%);
+}
+
+body.theme-night.theme-storm {
+  background:
+    radial-gradient(circle at 22% 8%, rgba(255, 225, 129, 0.16), transparent 13rem),
+    radial-gradient(circle at 82% 18%, rgba(98, 104, 210, 0.18), transparent 18rem),
+    linear-gradient(160deg, #11182d 0%, #17172b 45%, #221830 74%, #090914 100%);
+}
+
 button,
 input {
   font: inherit;
@@ -669,6 +713,7 @@ h1 {
   background: rgba(255, 255, 255, 0.1);
   overflow: visible;
   touch-action: none;
+  user-select: none;
 }
 
 .chart-line {
@@ -690,6 +735,19 @@ h1 {
 .chart-grid {
   stroke: rgba(255, 255, 255, 0.13);
   stroke-width: 1;
+}
+
+.chart-active {
+  opacity: 0;
+  stroke: rgba(255, 255, 255, 0.72);
+  stroke-dasharray: 4 5;
+  stroke-linecap: round;
+  stroke-width: 1.4;
+  transition: opacity 120ms ease;
+}
+
+.chart-active.visible {
+  opacity: 1;
 }
 
 .chart-label {

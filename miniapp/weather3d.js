@@ -5,6 +5,7 @@ const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 
 const state = {
   mode: "clear",
+  night: false,
   ready: false,
   width: 1,
   height: 1,
@@ -160,7 +161,8 @@ function createClouds(mode) {
 function rebuildWeather() {
   if (!state.ready) return;
   clearSceneWeather();
-  glow.visible = state.mode === "clear" || state.mode === "cloudy";
+  const isNight = document.body.classList.contains("theme-night");
+  glow.visible = !isNight && (state.mode === "clear" || state.mode === "cloudy");
   glow.material.opacity = state.mode === "clear" ? 0.2 : 0.08;
 
   if (state.mode === "cloudy" || state.mode === "storm") createClouds(state.mode);
@@ -169,14 +171,17 @@ function rebuildWeather() {
 
 function setMode(mode) {
   const normalized = ["clear", "cloudy", "rain", "snow", "storm"].includes(mode) ? mode : "clear";
-  if (state.mode === normalized && state.particles) return;
+  const isNight = document.body.classList.contains("theme-night");
+  if (state.mode === normalized && state.night === isNight && state.particles) return;
   state.mode = normalized;
+  state.night = isNight;
   rebuildWeather();
 }
 
 function setModeFromBody() {
   const mode = ["clear", "cloudy", "rain", "snow", "storm"].find((item) => document.body.classList.contains(`theme-${item}`));
   setMode(mode || "clear");
+  rebuildWeather();
 }
 
 function resize() {

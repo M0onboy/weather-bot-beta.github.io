@@ -444,10 +444,11 @@ function themeForCode(code) {
   return "theme-clear";
 }
 
-function applyTheme(code) {
-  document.body.classList.remove("theme-clear", "theme-cloudy", "theme-rain", "theme-snow", "theme-storm");
+function applyTheme(code, isDay = true) {
+  document.body.classList.remove("theme-clear", "theme-cloudy", "theme-rain", "theme-snow", "theme-storm", "theme-night");
   const theme = themeForCode(code);
   document.body.classList.add(theme);
+  document.body.classList.toggle("theme-night", !isDay);
   setWeatherAnimation(theme.replace("theme-", ""));
 }
 
@@ -831,7 +832,7 @@ function renderCurrent(location, data) {
   const current = data.current;
   const daily = data.daily;
   const [description] = describe(current.weather_code);
-  applyTheme(current.weather_code);
+  applyTheme(current.weather_code, Boolean(current.is_day));
   $("#heroIcon").innerHTML = weatherIcon(iconType(current.weather_code));
   $("#locationName").textContent = location.country ? `${location.name}, ${location.country}` : location.name;
   $("#temperature").textContent = `${round(current.temperature_2m)}°`;
@@ -1002,6 +1003,27 @@ function placeTooltip(svg, tooltip, x, y, value, time, unit) {
   tooltip.classList.add("visible");
 }
 
+function setActiveChartMarker(svg, x) {
+  const marker = svg.querySelector(".chart-active");
+  if (!marker) return;
+  marker.setAttribute("x1", x.toFixed(1));
+  marker.setAttribute("x2", x.toFixed(1));
+  marker.classList.add("visible");
+}
+
+function hideActiveChartMarker(svg) {
+  svg.querySelector(".chart-active")?.classList.remove("visible");
+}
+
+function showNearestChartValue(svg, tooltip, points, values, times, unit, clientX) {
+  const rect = svg.getBoundingClientRect();
+  const localX = ((clientX - rect.left) / Math.max(1, rect.width)) * 320;
+  const index = clamp(Math.round(((localX - 24) / 280) * (values.length - 1)), 0, values.length - 1);
+  const [x, y] = points[index];
+  placeTooltip(svg, tooltip, x, y, values[index], times[index], unit);
+  setActiveChartMarker(svg, x);
+}
+
 function renderLineChart(svg, tooltip, values, times, unit) {
   const min = Math.min(...values);
   const max = Math.max(...values);
@@ -1016,6 +1038,7 @@ function renderLineChart(svg, tooltip, values, times, unit) {
     ${renderGrid(svg, min, max)}
     <path class="chart-area" d="${area}"></path>
     <path class="chart-line" d="${path}"></path>
+    <line class="chart-active" x1="24" y1="12" x2="24" y2="112"></line>
     ${points.map(([x, y], index) => `<circle class="chart-point" cx="${x}" cy="${y}" r="3"></circle><rect class="chart-hit" x="${x - 8}" y="8" width="16" height="112" data-index="${index}"></rect>`).join("")}
     <text class="chart-label" x="24" y="124">${chartTimeLabel(times[0])}</text>
     <text class="chart-label" x="266" y="124">${chartTimeLabel(times[times.length - 1])}</text>
@@ -1034,6 +1057,7 @@ function renderBarChart(svg, tooltip, values, times, unit) {
   });
   svg.innerHTML = `
     ${renderGrid(svg, 0, max)}
+    <line class="chart-active" x1="24" y1="12" x2="24" y2="112"></line>
     ${values.map((value, index) => {
       const height = Math.max(4, (value / 100) * 88);
       const x = 24 + index * width;
@@ -1050,6 +1074,7 @@ function attachChartTooltip(svg, tooltip, points, values, times, unit) {
   const show = (index) => {
     const [x, y] = points[index];
     placeTooltip(svg, tooltip, x, y, values[index], times[index], unit);
+    setActiveChartMarker(svg, x);
   };
   svg.querySelectorAll(".chart-hit").forEach((hit) => {
     const index = Number(hit.dataset.index);
@@ -1057,7 +1082,26 @@ function attachChartTooltip(svg, tooltip, points, values, times, unit) {
     hit.addEventListener("pointermove", () => show(index));
     hit.addEventListener("pointerdown", () => show(index));
   });
-  svg.addEventListener("pointerleave", () => tooltip.classList.remove("visible"));
+  svg.addEventListener("pointerdown", (event) => {
+    svg.setPointerCapture?.(event.pointerId);
+    showNearestChartValue(svg, tooltip, points, values, times, unit, event.clientX);
+  });
+  svg.addEventListener("pointermove", (event) => {
+    if (event.pointerType === "touch" || event.buttons || tooltip.classList.contains("visible")) {
+      showNearestChartValue(svg, tooltip, points, values, times, unit, event.clientX);
+    }
+  });
+  svg.addEventListener("pointerup", (event) => {
+    svg.releasePointerCapture?.(event.pointerId);
+  });
+  svg.addEventListener("pointercancel", () => {
+    tooltip.classList.remove("visible");
+    hideActiveChartMarker(svg);
+  });
+  svg.addEventListener("pointerleave", () => {
+    tooltip.classList.remove("visible");
+    hideActiveChartMarker(svg);
+  });
 }
 
 function renderHourly(data) {
