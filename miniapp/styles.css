@@ -358,7 +358,8 @@ h1 {
 }
 
 .panel,
-.stats-grid article {
+.stats-grid article,
+.stats-grid details {
   border: 1px solid var(--panel-border);
   background: var(--panel);
   backdrop-filter: blur(28px);
