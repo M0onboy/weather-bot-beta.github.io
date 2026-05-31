@@ -298,6 +298,22 @@ function readStoredFavorites() {
   }
 }
 
+function readStoredLocation() {
+  try {
+    const location = JSON.parse(localStorage.getItem("weatherDefaultLocation") || "null");
+    if (!location?.name || location.latitude === undefined || location.longitude === undefined) return null;
+    return {
+      name: location.name,
+      latitude: Number(location.latitude),
+      longitude: Number(location.longitude),
+      country: location.country || "",
+      timezone: location.timezone || "",
+    };
+  } catch {
+    return null;
+  }
+}
+
 function decodeSyncPayload() {
   const encoded = new URLSearchParams(window.location.search).get("sync");
   if (!encoded) return null;
@@ -336,7 +352,7 @@ const syncPayload = decodeSyncPayload();
 
 const state = {
   lang: ["ru", "kk", "en"].includes(syncPayload?.lang) ? syncPayload.lang : ["ru", "kk", "en"].includes(initialLang) ? initialLang : "ru",
-  location: { name: "Almaty", latitude: 43.25, longitude: 76.95, country: "Kazakhstan" },
+  location: readStoredLocation() || { name: "Almaty", latitude: 43.25, longitude: 76.95, country: "Kazakhstan" },
   data: null,
   favorites: mergeFavorites(syncPayload?.favorites || [], readStoredFavorites()),
 };
@@ -905,7 +921,7 @@ function saveCurrentCity() {
 }
 
 function syncFavoritesWithBot() {
-  if (!window.Telegram?.WebApp?.sendData) {
+  if (!syncPayload || !window.Telegram?.WebApp?.sendData) {
     $("#condition").textContent = msg("syncUnavailable");
     closeFavoritesMenu();
     return;
@@ -1400,6 +1416,7 @@ function renderAll() {
 async function update(location = state.location) {
   try {
     state.location = location;
+    localStorage.setItem("weatherDefaultLocation", JSON.stringify(location));
     $("#locationName").textContent = location.country ? `${location.name}, ${location.country}` : location.name;
     $("#condition").textContent = msg("updating");
     state.data = await loadForecast(location);
@@ -1409,24 +1426,41 @@ async function update(location = state.location) {
   }
 }
 
-function useBrowserLocation() {
-  if (!navigator.geolocation) {
-    $("#condition").textContent = msg("geolocationMissing");
-    return;
+function getBrowserLocation() {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error(msg("geolocationMissing")));
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        resolve({
+          name: msg("myLocation"),
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        });
+      },
+      () => reject(new Error(msg("geolocationDenied"))),
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 10 * 60 * 1000 },
+    );
+  });
+}
+
+async function useBrowserLocation({ silent = false } = {}) {
+  try {
+    $("#condition").textContent = msg("getting");
+    await update(await getBrowserLocation());
+    return true;
+  } catch (error) {
+    if (!silent) $("#condition").textContent = error.message || msg("geolocationDenied");
+    return false;
   }
-  navigator.geolocation.getCurrentPosition(
-    (position) => {
-      update({
-        name: msg("myLocation"),
-        latitude: position.coords.latitude,
-        longitude: position.coords.longitude,
-      });
-    },
-    () => {
-      $("#condition").textContent = msg("geolocationDenied");
-    },
-    { enableHighAccuracy: true, timeout: 12000 },
-  );
+}
+
+async function startApp() {
+  applyStaticText();
+  const usedLocation = await useBrowserLocation({ silent: true });
+  if (!usedLocation) await update();
 }
 
 $("#searchForm").addEventListener("submit", async (event) => {
@@ -1490,5 +1524,4 @@ window.Telegram?.WebApp?.expand();
 
 resizeWeatherCanvas();
 setWeatherAnimation("clear");
-applyStaticText();
-update();
+startApp();
