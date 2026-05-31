@@ -352,6 +352,7 @@ const syncPayload = decodeSyncPayload();
 
 const state = {
   lang: ["ru", "kk", "en"].includes(syncPayload?.lang) ? syncPayload.lang : ["ru", "kk", "en"].includes(initialLang) ? initialLang : "ru",
+  defaultLocation: readStoredLocation(),
   location: readStoredLocation() || { name: "Almaty", latitude: 43.25, longitude: 76.95, country: "Kazakhstan" },
   data: null,
   favorites: mergeFavorites(syncPayload?.favorites || [], readStoredFavorites()),
@@ -1459,6 +1460,10 @@ async function useBrowserLocation({ silent = false } = {}) {
 
 async function startApp() {
   applyStaticText();
+  if (state.defaultLocation) {
+    await update(state.defaultLocation);
+    return;
+  }
   const usedLocation = await useBrowserLocation({ silent: true });
   if (!usedLocation) await update();
 }
