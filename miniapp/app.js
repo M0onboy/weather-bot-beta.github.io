@@ -917,7 +917,7 @@ async function reverseGeocode(latitude, longitude) {
   try {
     data = await fetchJson(`${reverseGeocodingUrl}?${params}`, 5000);
   } catch {
-    return null;
+    return reverseGeocodeFallback(latitude, longitude);
   }
   const item = data.results?.[0];
   if (!item) return reverseGeocodeFallback(latitude, longitude);
@@ -939,7 +939,10 @@ async function reverseGeocodeFallback(latitude, longitude) {
   });
   try {
     const data = await fetchJson(`${reverseFallbackUrl}?${params}`, 5000);
-    const name = data.city || data.locality || data.principalSubdivision;
+    const administrative = data.localityInfo?.administrative || [];
+    const informative = data.localityInfo?.informative || [];
+    const namedPlace = [...informative, ...administrative].find((item) => item?.name && item.name !== data.countryName);
+    const name = data.city || data.locality || data.principalSubdivision || namedPlace?.name;
     if (!name) return null;
     return {
       name,
@@ -960,6 +963,18 @@ function isCoordinateName(name) {
 async function resolveLocationName(location) {
   if (!location || !isCoordinateName(location.name)) return location;
   return (await reverseGeocode(location.latitude, location.longitude)) || location;
+}
+
+function currentHourlyIndex(data) {
+  const hours = data.hourly.time;
+  const currentHour = data.current?.time?.slice(0, 13);
+  if (currentHour) {
+    const exact = hours.findIndex((time) => time.slice(0, 13) === currentHour);
+    if (exact >= 0) return exact;
+    const next = hours.findIndex((time) => time.slice(0, 13) > currentHour);
+    if (next >= 0) return next;
+  }
+  return 0;
 }
 
 async function loadForecast(location) {
@@ -1168,9 +1183,11 @@ function renderAlerts(data) {
 }
 
 function renderCharts(data) {
-  const temps = data.hourly.temperature_2m.slice(0, 24).map(Number);
-  const rain = data.hourly.precipitation_probability.slice(0, 24).map(Number);
-  const times = data.hourly.time.slice(0, 24);
+  const start = currentHourlyIndex(data);
+  const end = start + 24;
+  const temps = data.hourly.temperature_2m.slice(start, end).map(Number);
+  const rain = data.hourly.precipitation_probability.slice(start, end).map(Number);
+  const times = data.hourly.time.slice(start, end);
   $("#tempChartMeta").textContent = `${Math.min(...temps)}°...${Math.max(...temps)}°`;
   $("#rainChartMeta").textContent = `${Math.max(...rain)}% ${unit("max")}`;
   renderLineChart($("#tempChart"), $("#tempTooltip"), temps, times, "°");
@@ -1312,10 +1329,12 @@ function renderHourly(data) {
   const holder = $("#hourly");
   const template = $("#hourTemplate");
   holder.textContent = "";
-  data.hourly.time.slice(0, 24).forEach((time, index) => {
+  const start = currentHourlyIndex(data);
+  data.hourly.time.slice(start, start + 24).forEach((time, offset) => {
+    const index = start + offset;
     const node = template.content.cloneNode(true);
     const type = iconType(data.hourly.weather_code[index]);
-    node.querySelector(".hour").textContent = index === 0 ? msg("now") : hourLabel(time);
+    node.querySelector(".hour").textContent = offset === 0 ? msg("now") : hourLabel(time);
     node.querySelector(".hour-icon").innerHTML = weatherIcon(type, true);
     node.querySelector(".hour-temp").textContent = `${round(data.hourly.temperature_2m[index])}°`;
     node.querySelector(".hour-rain").textContent = `${data.hourly.precipitation_probability[index]}%`;
