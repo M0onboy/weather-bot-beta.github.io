@@ -333,6 +333,12 @@ function favoriteKey(location) {
   return `${Number(location.latitude).toFixed(4)}:${Number(location.longitude).toFixed(4)}`;
 }
 
+function favoriteIndex(location) {
+  if (!location) return -1;
+  const key = favoriteKey(location);
+  return state.favorites.findIndex((item) => favoriteKey(item) === key);
+}
+
 function mergeFavorites(...groups) {
   const merged = new Map();
   groups.flat().forEach((item) => {
@@ -773,6 +779,7 @@ function applyStaticText() {
   $("#favoritesMenuButton").title = msg("favorites");
   $("#favoritesTitle").textContent = msg("favorites");
   $("#syncFavoritesButton").textContent = msg("syncFavorites");
+  updateSaveButtonState();
   document.querySelectorAll("[data-lang]").forEach((button) => {
     button.classList.toggle("active", button.dataset.lang === state.lang);
   });
@@ -892,6 +899,7 @@ function renderCurrent(location, data) {
       `,
     )
     .join("");
+  updateSaveButtonState();
 }
 
 function renderFavoritesMenu() {
@@ -934,14 +942,25 @@ function renderFavoritesMenu() {
 
 function saveCurrentCity() {
   const location = state.location;
-  const exists = state.favorites.some((item) => item.name === location.name && Number(item.latitude).toFixed(2) === Number(location.latitude).toFixed(2));
-  if (!exists) {
+  const index = favoriteIndex(location);
+  if (index >= 0) {
+    state.favorites.splice(index, 1);
+  } else {
     state.favorites.unshift(location);
     state.favorites = state.favorites.slice(0, 8);
-    localStorage.setItem("weatherFavorites", JSON.stringify(state.favorites));
-    renderFavoritesMenu();
   }
+  localStorage.setItem("weatherFavorites", JSON.stringify(state.favorites));
+  updateSaveButtonState();
+  renderFavoritesMenu();
   $("#condition").textContent = msg("savedCity");
+}
+
+function updateSaveButtonState() {
+  const button = $("#saveCityButton");
+  if (!button || !state.location) return;
+  const isSaved = favoriteIndex(state.location) >= 0;
+  button.classList.toggle("saved", isSaved);
+  button.setAttribute("aria-pressed", String(isSaved));
 }
 
 function syncFavoritesWithBot() {

@@ -446,6 +446,18 @@ summary {
   background: rgba(255, 255, 255, 0.1);
 }
 
+.dock-button.saved {
+  color: #071728;
+  background: linear-gradient(135deg, #ffe58a, #ffb84d);
+  box-shadow:
+    0 8px 22px rgba(255, 184, 77, 0.26),
+    inset 0 1px 0 rgba(255, 255, 255, 0.42);
+}
+
+.dock-button.saved svg {
+  fill: currentColor;
+}
+
 .dock-side {
   width: 72px;
   height: 72px;
