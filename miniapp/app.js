@@ -1,4 +1,5 @@
 const geocodingUrl = "https://geocoding-api.open-meteo.com/v1/search";
+const reverseGeocodingUrl = "https://geocoding-api.open-meteo.com/v1/reverse";
 const forecastUrl = "https://api.open-meteo.com/v1/forecast";
 
 const messages = {
@@ -794,6 +795,28 @@ async function geocode(city) {
   };
 }
 
+async function reverseGeocode(latitude, longitude) {
+  const language = state.lang === "en" ? "en" : "ru";
+  const params = new URLSearchParams({
+    latitude,
+    longitude,
+    language,
+    format: "json",
+  });
+  const response = await fetch(`${reverseGeocodingUrl}?${params}`);
+  if (!response.ok) return null;
+  const data = await response.json();
+  const item = data.results?.[0];
+  if (!item) return null;
+  return {
+    name: item.name,
+    latitude,
+    longitude,
+    country: item.country || "",
+    timezone: item.timezone || "",
+  };
+}
+
 async function loadForecast(location) {
   const params = new URLSearchParams({
     latitude: location.latitude,
@@ -948,6 +971,15 @@ function openFavoritesMenu() {
 
 function closeFavoritesMenu() {
   $("#favoritesSheet").hidden = true;
+}
+
+function toggleLanguageMenu(force) {
+  const menu = $("#languageMenu");
+  const button = $("#languageButton");
+  const isOpen = force ?? !menu.classList.contains("open");
+  menu.classList.toggle("open", isOpen);
+  button.classList.toggle("active", isOpen);
+  button.setAttribute("aria-expanded", String(isOpen));
 }
 
 function alertMessages(data) {
@@ -1434,12 +1466,19 @@ function getBrowserLocation() {
       return;
     }
     navigator.geolocation.getCurrentPosition(
-      (position) => {
-        resolve({
-          name: msg("myLocation"),
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-        });
+      async (position) => {
+        const latitude = position.coords.latitude;
+        const longitude = position.coords.longitude;
+        const resolvedLocation = await reverseGeocode(latitude, longitude);
+        resolve(
+          resolvedLocation || {
+            name: `${latitude.toFixed(2)}, ${longitude.toFixed(2)}`,
+            latitude,
+            longitude,
+            country: "",
+            timezone: "",
+          },
+        );
       },
       () => reject(new Error(msg("geolocationDenied"))),
       { enableHighAccuracy: true, timeout: 12000, maximumAge: 10 * 60 * 1000 },
@@ -1495,16 +1534,21 @@ document.addEventListener("pointerdown", (event) => {
   if (document.activeElement === input && !event.target.closest(".search")) {
     input.blur();
   }
+  if (!event.target.closest(".language-menu") && !event.target.closest("#languageButton")) {
+    toggleLanguageMenu(false);
+  }
 });
 
 document.querySelectorAll("[data-lang]").forEach((button) => {
   button.addEventListener("click", () => {
     state.lang = button.dataset.lang;
     localStorage.setItem("weatherLang", state.lang);
+    toggleLanguageMenu(false);
     renderAll();
   });
 });
 
+$("#languageButton").addEventListener("click", () => toggleLanguageMenu());
 $("#geoButton").addEventListener("click", useBrowserLocation);
 $("#refreshButton").addEventListener("click", () => update());
 $("#saveCityButton").addEventListener("click", saveCurrentCity);
