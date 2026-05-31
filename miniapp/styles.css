@@ -400,7 +400,7 @@ summary {
   margin: 0 auto;
   display: grid;
   grid-template-columns: 72px minmax(176px, 1fr) 72px;
-  align-items: end;
+  align-items: center;
   gap: 18px;
   pointer-events: none;
 }
@@ -433,6 +433,8 @@ summary {
   background: transparent;
   display: grid;
   place-items: center;
+  align-self: center;
+  justify-self: center;
   cursor: pointer;
   transition:
     transform 180ms ease,
@@ -447,6 +449,8 @@ summary {
 .dock-side {
   width: 72px;
   height: 72px;
+  min-width: 72px;
+  min-height: 72px;
   border: 1px solid rgba(142, 204, 255, 0.2);
   background: rgba(4, 19, 35, 0.86);
   -webkit-backdrop-filter: blur(28px) saturate(150%);
@@ -1252,6 +1256,8 @@ h2 {
   .dock-side {
     width: 64px;
     height: 64px;
+    min-width: 64px;
+    min-height: 64px;
   }
 
   .dock-button {
