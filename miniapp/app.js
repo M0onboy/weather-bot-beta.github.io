@@ -1,5 +1,6 @@
 const geocodingUrl = "https://geocoding-api.open-meteo.com/v1/search";
 const reverseGeocodingUrl = "https://geocoding-api.open-meteo.com/v1/reverse";
+const reverseFallbackUrl = "https://api.bigdatacloud.net/data/reverse-geocode-client";
 const forecastUrl = "https://api.open-meteo.com/v1/forecast";
 
 const messages = {
@@ -831,11 +832,70 @@ function applyStaticText() {
   renderFavoritesMenu();
 }
 
+function normalizeSearchText(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/ё/g, "е")
+    .replace(/[.,]/g, " ")
+    .replace(/\b(город|г|city|town|қала)\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function searchVariants(value) {
+  const normalized = normalizeSearchText(value);
+  const variants = new Set([value.trim(), normalized]);
+  if (normalized.endsWith("а")) variants.add(normalized.slice(0, -1) + "ы");
+  if (normalized.endsWith("ы")) variants.add(normalized.slice(0, -1) + "а");
+  if (normalized.endsWith("ск")) variants.add(normalized.slice(0, -2));
+  return Array.from(variants).filter(Boolean);
+}
+
+function similarityDistance(left, right) {
+  left = normalizeSearchText(left);
+  right = normalizeSearchText(right);
+  const costs = Array.from({ length: right.length + 1 }, (_, index) => index);
+  for (let i = 1; i <= left.length; i += 1) {
+    let previous = costs[0];
+    costs[0] = i;
+    for (let j = 1; j <= right.length; j += 1) {
+      const current = costs[j];
+      costs[j] = Math.min(
+        costs[j] + 1,
+        costs[j - 1] + 1,
+        previous + (left[i - 1] === right[j - 1] ? 0 : 1),
+      );
+      previous = current;
+    }
+  }
+  return costs[right.length];
+}
+
+function bestGeocodeResult(results, query) {
+  const normalizedQuery = normalizeSearchText(query);
+  return [...results].sort((left, right) => {
+    const leftName = normalizeSearchText(left.name);
+    const rightName = normalizeSearchText(right.name);
+    const leftPrefix = leftName.startsWith(normalizedQuery) ? -6 : 0;
+    const rightPrefix = rightName.startsWith(normalizedQuery) ? -6 : 0;
+    const leftScore = similarityDistance(left.name, query) + leftPrefix - Math.log10((left.population || 1) + 1);
+    const rightScore = similarityDistance(right.name, query) + rightPrefix - Math.log10((right.population || 1) + 1);
+    return leftScore - rightScore;
+  })[0];
+}
+
 async function geocode(city) {
   const language = state.lang === "en" ? "en" : "ru";
-  const params = new URLSearchParams({ name: city, count: "1", language, format: "json" });
-  const data = await fetchJson(`${geocodingUrl}?${params}`, 8000);
-  const item = data.results?.[0];
+  let item = null;
+  for (const variant of searchVariants(city)) {
+    const params = new URLSearchParams({ name: variant, count: "8", language, format: "json" });
+    const data = await fetchJson(`${geocodingUrl}?${params}`, 8000);
+    const results = data.results || [];
+    if (results.length) {
+      item = bestGeocodeResult(results, city);
+      break;
+    }
+  }
   if (!item) throw new Error(msg("cityNotFound"));
   return {
     name: item.name,
@@ -860,7 +920,7 @@ async function reverseGeocode(latitude, longitude) {
     return null;
   }
   const item = data.results?.[0];
-  if (!item) return null;
+  if (!item) return reverseGeocodeFallback(latitude, longitude);
   return {
     name: item.name,
     latitude,
@@ -868,6 +928,38 @@ async function reverseGeocode(latitude, longitude) {
     country: item.country || "",
     timezone: item.timezone || "",
   };
+}
+
+async function reverseGeocodeFallback(latitude, longitude) {
+  const localityLanguage = state.lang === "kk" ? "ru" : state.lang;
+  const params = new URLSearchParams({
+    latitude,
+    longitude,
+    localityLanguage,
+  });
+  try {
+    const data = await fetchJson(`${reverseFallbackUrl}?${params}`, 5000);
+    const name = data.city || data.locality || data.principalSubdivision;
+    if (!name) return null;
+    return {
+      name,
+      latitude,
+      longitude,
+      country: data.countryName || "",
+      timezone: "",
+    };
+  } catch {
+    return null;
+  }
+}
+
+function isCoordinateName(name) {
+  return /^-?\d{1,2}(?:\.\d+)?,\s*-?\d{1,3}(?:\.\d+)?$/.test(String(name || ""));
+}
+
+async function resolveLocationName(location) {
+  if (!location || !isCoordinateName(location.name)) return location;
+  return (await reverseGeocode(location.latitude, location.longitude)) || location;
 }
 
 async function loadForecast(location) {
@@ -1510,6 +1602,7 @@ function renderAll() {
 }
 
 async function update(location = state.location) {
+  location = await resolveLocationName(location);
   const cached = readCachedForecast(location);
   let renderedCached = false;
   try {
