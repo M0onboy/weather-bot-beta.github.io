@@ -1294,34 +1294,21 @@ h2 {
 
 @media (min-width: 900px) {
   .app-shell {
-    width: min(980px, calc(100% - 96px));
-    display: grid;
-    grid-template-columns: minmax(340px, 0.9fr) minmax(520px, 1.25fr);
-    gap: 18px;
-    align-items: start;
+    width: min(760px, calc(100% - 96px));
+    display: block;
   }
 
   .hero {
-    position: sticky;
-    top: calc(env(safe-area-inset-top) + 20px);
-    min-height: calc(100vh - 168px);
-    padding-bottom: 0;
-  }
-
-  .alert-card,
-  .hourly-panel,
-  .charts-panel,
-  .panel:not(.hourly-panel):not(.charts-panel),
-  .stats-grid {
-    grid-column: 2;
+    min-height: 48vh;
+    padding-bottom: 24px;
   }
 
   .alert-card {
-    margin-top: 0;
+    margin-top: 14px;
   }
 
   .chart-block svg {
-    height: 170px;
+    height: 150px;
   }
 
   .stats-grid {
