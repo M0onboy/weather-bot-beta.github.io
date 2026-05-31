@@ -57,6 +57,46 @@ body {
   display: block;
 }
 
+#webglWeather::before,
+#webglWeather::after {
+  content: "";
+  position: absolute;
+  inset: -18%;
+  pointer-events: none;
+  opacity: 0.34;
+  filter: blur(22px);
+  mix-blend-mode: screen;
+  animation: atmosphereDrift 18s ease-in-out infinite alternate;
+}
+
+#webglWeather::before {
+  background:
+    linear-gradient(115deg, transparent 8%, rgba(255, 255, 255, 0.18) 32%, transparent 58%),
+    linear-gradient(35deg, transparent 18%, rgba(132, 222, 255, 0.14) 48%, transparent 72%);
+}
+
+#webglWeather::after {
+  opacity: 0.22;
+  background:
+    linear-gradient(165deg, transparent 20%, rgba(255, 244, 204, 0.14) 46%, transparent 68%),
+    linear-gradient(12deg, transparent 24%, rgba(149, 177, 255, 0.12) 54%, transparent 78%);
+  animation-duration: 24s;
+  animation-direction: alternate-reverse;
+}
+
+body.theme-rain #webglWeather::before,
+body.theme-storm #webglWeather::before {
+  opacity: 0.42;
+  background:
+    linear-gradient(105deg, transparent 12%, rgba(166, 226, 255, 0.2) 36%, transparent 62%),
+    repeating-linear-gradient(105deg, transparent 0 28px, rgba(200, 239, 255, 0.06) 30px 34px, transparent 36px 70px);
+}
+
+body.theme-night #webglWeather::before,
+body.theme-night #webglWeather::after {
+  opacity: 0.2;
+}
+
 body.webgl-ready #webglWeather {
   opacity: 1;
 }
@@ -1229,6 +1269,15 @@ h2 {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes atmosphereDrift {
+  from {
+    transform: translate3d(-4%, -2%, 0) rotate(-2deg) scale(1.02);
+  }
+  to {
+    transform: translate3d(4%, 3%, 0) rotate(2deg) scale(1.08);
   }
 }
 

@@ -315,6 +315,39 @@ function readStoredLocation() {
   }
 }
 
+function readCachedForecast(location) {
+  try {
+    const cache = JSON.parse(localStorage.getItem("weatherForecastCache") || "{}");
+    const item = cache[favoriteKey(location)];
+    if (!item?.data) return null;
+    return item;
+  } catch {
+    return null;
+  }
+}
+
+function writeCachedForecast(location, data) {
+  try {
+    const cache = JSON.parse(localStorage.getItem("weatherForecastCache") || "{}");
+    cache[favoriteKey(location)] = { data, savedAt: Date.now() };
+    localStorage.setItem("weatherForecastCache", JSON.stringify(cache));
+  } catch {
+    // Storage can be unavailable in some embedded browser modes.
+  }
+}
+
+async function fetchJson(url, timeoutMs = 10000) {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    if (!response.ok) throw new Error(msg("forecastError"));
+    return await response.json();
+  } finally {
+    window.clearTimeout(timeout);
+  }
+}
+
 function decodeSyncPayload() {
   const encoded = new URLSearchParams(window.location.search).get("sync");
   if (!encoded) return null;
@@ -622,15 +655,20 @@ function drawRain(ctx, dt, mode) {
     if (drop.y > height + 60 || drop.x < -80) {
       Object.assign(drop, createParticle(mode, width, height), { y: random(-120, -20) });
     }
-    ctx.strokeStyle = `rgba(205,239,255,${drop.alpha})`;
-    ctx.lineWidth = mode === "storm" ? 1.5 : 1.2;
+    const gradient = ctx.createLinearGradient(drop.x, drop.y, drop.x + drop.drift * 0.04, drop.y + drop.length);
+    gradient.addColorStop(0, "rgba(205,239,255,0)");
+    gradient.addColorStop(0.42, `rgba(218,247,255,${drop.alpha})`);
+    gradient.addColorStop(1, "rgba(120,205,255,0)");
+    ctx.strokeStyle = gradient;
+    ctx.lineWidth = mode === "storm" ? 2.1 : 1.7;
     ctx.beginPath();
     ctx.moveTo(drop.x, drop.y);
     ctx.lineTo(drop.x + drop.drift * 0.035, drop.y + drop.length);
     ctx.stroke();
 
     if (drop.splash > 0) {
-      ctx.strokeStyle = `rgba(220,246,255,${0.25 * drop.splash})`;
+      ctx.strokeStyle = `rgba(220,246,255,${0.2 * drop.splash})`;
+      ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.moveTo(drop.x - 8 * drop.splash, impactY);
       ctx.lineTo(drop.x + 8 * drop.splash, impactY);
@@ -651,23 +689,30 @@ function drawSnow(ctx, dt) {
     }
     if (flake.x < -20) flake.x = width + 20;
     if (flake.x > width + 20) flake.x = -20;
-    ctx.fillStyle = `rgba(255,255,255,${flake.alpha})`;
+    const gradient = ctx.createRadialGradient(flake.x, flake.y, 0, flake.x, flake.y, flake.size * 3.2);
+    gradient.addColorStop(0, `rgba(255,255,255,${flake.alpha})`);
+    gradient.addColorStop(0.35, `rgba(255,255,255,${flake.alpha * 0.42})`);
+    gradient.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = gradient;
     ctx.beginPath();
-    ctx.arc(flake.x, flake.y, flake.size, 0, Math.PI * 2);
+    ctx.arc(flake.x, flake.y, flake.size * 3.2, 0, Math.PI * 2);
     ctx.fill();
   });
 }
 
 function drawClear(ctx, dt) {
   const { width, height } = weatherCanvas;
+  const night = document.body.classList.contains("theme-night");
   weatherCanvas.particles.forEach((spark) => {
     spark.phase += dt * spark.speed;
     const alpha = spark.alpha * (0.55 + Math.sin(spark.phase) * 0.45);
-    ctx.fillStyle = `rgba(255,245,198,${alpha})`;
+    const color = night ? "220,236,255" : "255,245,198";
+    const radius = night ? spark.size * 1.5 : spark.size;
+    ctx.fillStyle = `rgba(${color},${alpha})`;
     ctx.beginPath();
-    ctx.arc(spark.x, spark.y, spark.size, 0, Math.PI * 2);
+    ctx.arc(spark.x, spark.y, radius, 0, Math.PI * 2);
     ctx.fill();
-    spark.y -= dt * spark.speed;
+    spark.y += night ? Math.sin(spark.phase) * dt * 1.5 : -dt * spark.speed;
     if (spark.y < -10) {
       spark.y = height + 10;
       spark.x = random(0, width);
@@ -789,9 +834,7 @@ function applyStaticText() {
 async function geocode(city) {
   const language = state.lang === "en" ? "en" : "ru";
   const params = new URLSearchParams({ name: city, count: "1", language, format: "json" });
-  const response = await fetch(`${geocodingUrl}?${params}`);
-  if (!response.ok) throw new Error(msg("cityNotFound"));
-  const data = await response.json();
+  const data = await fetchJson(`${geocodingUrl}?${params}`, 8000);
   const item = data.results?.[0];
   if (!item) throw new Error(msg("cityNotFound"));
   return {
@@ -810,9 +853,12 @@ async function reverseGeocode(latitude, longitude) {
     language,
     format: "json",
   });
-  const response = await fetch(`${reverseGeocodingUrl}?${params}`);
-  if (!response.ok) return null;
-  const data = await response.json();
+  let data;
+  try {
+    data = await fetchJson(`${reverseGeocodingUrl}?${params}`, 5000);
+  } catch {
+    return null;
+  }
   const item = data.results?.[0];
   if (!item) return null;
   return {
@@ -870,9 +916,7 @@ async function loadForecast(location) {
       "wind_gusts_10m_max",
     ].join(","),
   });
-  const response = await fetch(`${forecastUrl}?${params}`);
-  if (!response.ok) throw new Error(msg("forecastError"));
-  return response.json();
+  return fetchJson(`${forecastUrl}?${params}`, 10000);
 }
 
 function renderCurrent(location, data) {
@@ -1466,15 +1510,24 @@ function renderAll() {
 }
 
 async function update(location = state.location) {
+  const cached = readCachedForecast(location);
+  let renderedCached = false;
   try {
     state.location = location;
     localStorage.setItem("weatherDefaultLocation", JSON.stringify(location));
     $("#locationName").textContent = location.country ? `${location.name}, ${location.country}` : location.name;
-    $("#condition").textContent = msg("updating");
+    if (cached) {
+      state.data = cached.data;
+      renderAll();
+      renderedCached = true;
+    } else {
+      $("#condition").textContent = msg("updating");
+    }
     state.data = await loadForecast(location);
+    writeCachedForecast(location, state.data);
     renderAll();
   } catch (error) {
-    $("#condition").textContent = error.message || msg("forecastError");
+    if (!renderedCached) $("#condition").textContent = error.name === "AbortError" ? msg("forecastError") : error.message || msg("forecastError");
   }
 }
 

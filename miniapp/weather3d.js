@@ -20,6 +20,7 @@ let renderer;
 let scene;
 let camera;
 let glow;
+const textures = {};
 
 function supportsWebGL() {
   try {
@@ -75,13 +76,66 @@ function clearSceneWeather() {
   state.particleData = [];
 }
 
+function spriteTexture(type) {
+  if (textures[type]) return textures[type];
+  const canvas = document.createElement("canvas");
+  canvas.width = 96;
+  canvas.height = 96;
+  const ctx = canvas.getContext("2d");
+
+  if (type === "rain") {
+    const gradient = ctx.createLinearGradient(38, 8, 58, 88);
+    gradient.addColorStop(0, "rgba(210,245,255,0)");
+    gradient.addColorStop(0.28, "rgba(210,245,255,0.88)");
+    gradient.addColorStop(1, "rgba(120,205,255,0)");
+    ctx.strokeStyle = gradient;
+    ctx.lineWidth = 6;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(34, 12);
+    ctx.lineTo(60, 84);
+    ctx.stroke();
+  } else if (type === "snow") {
+    const gradient = ctx.createRadialGradient(48, 48, 0, 48, 48, 44);
+    gradient.addColorStop(0, "rgba(255,255,255,0.95)");
+    gradient.addColorStop(0.32, "rgba(255,255,255,0.55)");
+    gradient.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.arc(48, 48, 44, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (type === "cloud") {
+    const gradient = ctx.createRadialGradient(48, 48, 0, 48, 48, 46);
+    gradient.addColorStop(0, "rgba(255,255,255,0.32)");
+    gradient.addColorStop(0.46, "rgba(220,235,255,0.16)");
+    gradient.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.ellipse(48, 50, 44, 22, 0, 0, Math.PI * 2);
+    ctx.fill();
+  } else {
+    const gradient = ctx.createRadialGradient(48, 48, 0, 48, 48, 42);
+    gradient.addColorStop(0, "rgba(255,248,214,0.98)");
+    gradient.addColorStop(0.18, "rgba(255,248,214,0.72)");
+    gradient.addColorStop(1, "rgba(255,248,214,0)");
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.arc(48, 48, 42, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  textures[type] = new THREE.CanvasTexture(canvas);
+  textures[type].colorSpace = THREE.SRGBColorSpace;
+  return textures[type];
+}
+
 function particleCount(mode) {
   const mobile = window.innerWidth < 460;
-  if (mode === "rain") return mobile ? 900 : 1500;
-  if (mode === "storm") return mobile ? 1100 : 1800;
-  if (mode === "snow") return mobile ? 360 : 620;
-  if (mode === "clear") return mobile ? 120 : 220;
-  return mobile ? 180 : 300;
+  if (mode === "rain") return mobile ? 420 : 720;
+  if (mode === "storm") return mobile ? 560 : 900;
+  if (mode === "snow") return mobile ? 260 : 460;
+  if (mode === "clear") return mobile ? 95 : 160;
+  return mobile ? 120 : 180;
 }
 
 function createParticles(mode) {
@@ -102,8 +156,8 @@ function createParticles(mode) {
     };
 
     if (mode === "rain" || mode === "storm") {
-      info.speed = THREE.MathUtils.randFloat(mode === "storm" ? 9 : 7, mode === "storm" ? 15 : 12);
-      info.drift = THREE.MathUtils.randFloat(-2.4, -1.2);
+      info.speed = THREE.MathUtils.randFloat(mode === "storm" ? 12 : 9, mode === "storm" ? 22 : 17);
+      info.drift = THREE.MathUtils.randFloat(-4.2, -2.0);
     } else if (mode === "snow") {
       info.speed = THREE.MathUtils.randFloat(0.7, 1.9);
       info.drift = THREE.MathUtils.randFloat(-0.45, 0.45);
@@ -120,13 +174,18 @@ function createParticles(mode) {
 
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  const isNight = document.body.classList.contains("theme-night");
+  const textureType = mode === "rain" || mode === "storm" ? "rain" : mode === "snow" ? "snow" : "star";
   const material = new THREE.PointsMaterial({
-    color: mode === "clear" ? 0xfff2bd : mode === "snow" ? 0xffffff : 0xbfeeff,
-    size: mode === "rain" || mode === "storm" ? 2.4 : mode === "snow" ? 3.8 : 2.6,
+    color: mode === "clear" ? (isNight ? 0xdcecff : 0xfff2bd) : mode === "snow" ? 0xffffff : 0xc7f0ff,
+    map: spriteTexture(textureType),
+    size: mode === "rain" || mode === "storm" ? 30 : mode === "snow" ? 18 : isNight ? 7 : 4,
+    sizeAttenuation: true,
     transparent: true,
-    opacity: mode === "clear" ? 0.4 : mode === "snow" ? 0.72 : 0.58,
+    opacity: mode === "clear" ? (isNight ? 0.62 : 0.28) : mode === "snow" ? 0.7 : 0.48,
     depthWrite: false,
     blending: THREE.AdditiveBlending,
+    alphaTest: 0.02,
   });
 
   state.particles = new THREE.Points(geometry, material);
@@ -135,24 +194,27 @@ function createParticles(mode) {
 }
 
 function createClouds(mode) {
-  const count = mode === "cloudy" ? 12 : mode === "storm" ? 7 : 4;
+  const count = mode === "cloudy" ? 16 : mode === "storm" ? 10 : 5;
   const color = mode === "storm" ? 0x9aa4d9 : 0xffffff;
   for (let i = 0; i < count; i += 1) {
-    const geometry = new THREE.SphereGeometry(THREE.MathUtils.randFloat(36, 82), 24, 16);
+    const geometry = new THREE.PlaneGeometry(1, 1);
     const material = new THREE.MeshBasicMaterial({
       color,
+      map: spriteTexture("cloud"),
       transparent: true,
-      opacity: mode === "storm" ? 0.06 : 0.075,
+      opacity: mode === "storm" ? 0.16 : 0.18,
       depthWrite: false,
+      blending: THREE.NormalBlending,
     });
     const cloud = new THREE.Mesh(geometry, material);
-    cloud.scale.set(THREE.MathUtils.randFloat(1.5, 2.8), THREE.MathUtils.randFloat(0.22, 0.42), 1);
+    cloud.scale.set(THREE.MathUtils.randFloat(190, 360), THREE.MathUtils.randFloat(80, 150), 1);
     cloud.position.set(
       THREE.MathUtils.randFloatSpread(state.width * 1.2),
       THREE.MathUtils.randFloat(-state.height * 0.34, state.height * 0.34),
       THREE.MathUtils.randFloat(-260, -60),
     );
-    cloud.userData.speed = THREE.MathUtils.randFloat(0.08, 0.24);
+    cloud.userData.speed = THREE.MathUtils.randFloat(0.04, 0.16);
+    cloud.userData.phase = Math.random() * Math.PI * 2;
     scene.add(cloud);
     state.clouds.push(cloud);
   }
@@ -165,7 +227,7 @@ function rebuildWeather() {
   glow.visible = !isNight && (state.mode === "clear" || state.mode === "cloudy");
   glow.material.opacity = state.mode === "clear" ? 0.2 : 0.08;
 
-  if (state.mode === "cloudy" || state.mode === "storm") createClouds(state.mode);
+  if (state.mode === "cloudy" || state.mode === "storm" || state.mode === "rain" || state.mode === "snow") createClouds(state.mode);
   if (["rain", "snow", "storm", "clear"].includes(state.mode)) createParticles(state.mode);
 }
 
@@ -236,7 +298,8 @@ function updateClouds(delta) {
   const boundaryX = state.width * 0.75;
   state.clouds.forEach((cloud) => {
     cloud.position.x += cloud.userData.speed * delta * 60;
-    cloud.rotation.z = Math.sin(performance.now() * 0.0001 + cloud.position.y) * 0.02;
+    cloud.position.y += Math.sin(performance.now() * 0.00018 + cloud.userData.phase) * delta * 2.5;
+    cloud.rotation.z = Math.sin(performance.now() * 0.0001 + cloud.position.y) * 0.018;
     if (cloud.position.x > boundaryX) cloud.position.x = -boundaryX;
   });
 }
