@@ -434,11 +434,28 @@ function iconType(code) {
   return "clear";
 }
 
-function weatherIcon(type, compact = false) {
+function isNightAt(iso, data) {
+  if (!iso || !data?.daily?.sunrise || !data?.daily?.sunset) return document.body.classList.contains("theme-night");
+  const day = iso.slice(0, 10);
+  const index = data.daily.time.findIndex((date) => date === day);
+  if (index < 0) return document.body.classList.contains("theme-night");
+  const time = new Date(iso).getTime();
+  const sunrise = new Date(data.daily.sunrise[index]).getTime();
+  const sunset = new Date(data.daily.sunset[index]).getTime();
+  return time < sunrise || time >= sunset;
+}
+
+function weatherIcon(type, compact = false, forceNight = null) {
   const cls = compact ? "weather-svg compact" : "weather-svg";
+  const night = forceNight ?? document.body.classList.contains("theme-night");
   const sun = `
     <circle class="sun" cx="32" cy="32" r="13" />
     <path class="sun-ray" d="M32 6v7M32 51v7M6 32h7M51 32h7M13.6 13.6l5 5M45.4 45.4l5 5M50.4 13.6l-5 5M18.6 45.4l-5 5" />
+  `;
+  const moon = `
+    <path class="moon" d="M43 46a20 20 0 0 1-23-27 18 18 0 1 0 23 27Z" />
+    <circle class="star" cx="47" cy="17" r="2" />
+    <circle class="star" cx="52" cy="28" r="1.5" />
   `;
   const cloud = `
     <path class="cloud-shade" d="M19 45h27a12 12 0 0 0 1.3-23.9A17 17 0 0 0 15.5 27.5 9 9 0 0 0 19 45Z" />
@@ -452,8 +469,8 @@ function weatherIcon(type, compact = false) {
   const bolt = `<path class="bolt" d="M35 42 27 60l14-13h-8l6-13-16 18h9Z" />`;
 
   const body = {
-    clear: sun,
-    partly: `<g transform="translate(-6 -7) scale(.78)">${sun}</g><g transform="translate(7 10)">${cloud}</g>`,
+    clear: night ? moon : sun,
+    partly: night ? `<g transform="translate(-5 -5) scale(.78)">${moon}</g><g transform="translate(7 10)">${cloud}</g>` : `<g transform="translate(-6 -7) scale(.78)">${sun}</g><g transform="translate(7 10)">${cloud}</g>`,
     cloud,
     rain: `${cloud}${rain}`,
     snow: `${cloud}${snow}`,
@@ -1336,7 +1353,7 @@ function renderHourly(data) {
     const node = template.content.cloneNode(true);
     const type = iconType(data.hourly.weather_code[index]);
     node.querySelector(".hour").textContent = offset === 0 ? msg("now") : hourLabel(time);
-    node.querySelector(".hour-icon").innerHTML = weatherIcon(type, true);
+    node.querySelector(".hour-icon").innerHTML = weatherIcon(type, true, isNightAt(time, data));
     node.querySelector(".hour-temp").textContent = `${round(data.hourly.temperature_2m[index])}°`;
     node.querySelector(".hour-rain").textContent = `${data.hourly.precipitation_probability[index]}%`;
     holder.append(node);
@@ -1360,7 +1377,7 @@ function renderDaily(data) {
       todayRow.innerHTML = `
         <div class="day-row">
           <strong>${msg("today")}</strong>
-          <span class="day-icon">${weatherIcon(type, true)}</span>
+          <span class="day-icon">${weatherIcon(type, true, false)}</span>
           <span class="bar-wrap"><span class="bar" style="width:${width}%"></span></span>
           <span class="daily-meta">${round(low)}° / ${round(high)}°</span>
         </div>
@@ -1374,7 +1391,7 @@ function renderDaily(data) {
     card.innerHTML = `
       <summary class="day-row">
         <strong>${index === 0 ? msg("today") : dayLabel(time)}</strong>
-        <span class="day-icon">${weatherIcon(type, true)}</span>
+        <span class="day-icon">${weatherIcon(type, true, false)}</span>
         <span class="bar-wrap"><span class="bar" style="width:${width}%"></span></span>
         <span class="daily-meta">${round(low)}° / ${round(high)}°</span>
       </summary>

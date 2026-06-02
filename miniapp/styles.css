@@ -616,6 +616,16 @@ summary {
   fill: #ffd36f;
 }
 
+.weather-svg .moon {
+  fill: #edf5ff;
+  filter: drop-shadow(0 0 14px rgba(207, 231, 255, 0.48));
+}
+
+.weather-svg .star {
+  fill: #dfeeff;
+  opacity: 0.9;
+}
+
 .weather-svg .sun-ray,
 .weather-svg .stroke {
   fill: none;
