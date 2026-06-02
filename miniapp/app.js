@@ -987,6 +987,7 @@ async function loadForecast(location) {
       "temperature_2m",
       "relative_humidity_2m",
       "apparent_temperature",
+      "is_day",
       "precipitation",
       "weather_code",
       "cloud_cover",
@@ -1030,7 +1031,7 @@ function renderCurrent(location, data) {
   const current = data.current;
   const daily = data.daily;
   const [description] = describe(current.weather_code);
-  applyTheme(current.weather_code, Boolean(current.is_day));
+  applyTheme(current.weather_code, current.is_day === undefined ? true : Number(current.is_day) === 1);
   $("#heroIcon").innerHTML = weatherIcon(iconType(current.weather_code));
   $("#locationName").textContent = location.country ? `${location.name}, ${location.country}` : location.name;
   $("#temperature").textContent = `${round(current.temperature_2m)}°`;
