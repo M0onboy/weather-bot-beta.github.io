@@ -445,6 +445,13 @@ function isNightAt(iso, data) {
   return time < sunrise || time >= sunset;
 }
 
+function isCurrentDaytime(data) {
+  const current = data.current || {};
+  if (current.is_day !== undefined) return Number(current.is_day) === 1;
+  if (!current.time || !data.daily?.sunrise || !data.daily?.sunset) return true;
+  return !isNightAt(current.time, data);
+}
+
 function weatherIcon(type, compact = false, forceNight = null) {
   const cls = compact ? "weather-svg compact" : "weather-svg";
   const night = forceNight ?? document.body.classList.contains("theme-night");
@@ -1048,7 +1055,7 @@ function renderCurrent(location, data) {
   const current = data.current;
   const daily = data.daily;
   const [description] = describe(current.weather_code);
-  applyTheme(current.weather_code, current.is_day === undefined ? true : Number(current.is_day) === 1);
+  applyTheme(current.weather_code, isCurrentDaytime(data));
   $("#heroIcon").innerHTML = weatherIcon(iconType(current.weather_code));
   $("#locationName").textContent = location.country ? `${location.name}, ${location.country}` : location.name;
   $("#temperature").textContent = `${round(current.temperature_2m)}°`;
